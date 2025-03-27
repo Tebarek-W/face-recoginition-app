@@ -27,11 +27,11 @@ INSTALLED_APPS = [
     'authentication',
     'users',
     'departments',
+    'schedules',
+    'attendance',
     'courses',
     'students',
     'instructors',
-    'schedules',
-    'attendance',
     'facial_data',
 ]
 
@@ -154,9 +154,17 @@ SIMPLE_JWT = {
 # CORS settings
 CORS_ALLOW_ALL_ORIGINS = True  # Allow all origins (for development only)
 
-# Alternatively, allow specific origins (recommended for production)
 CORS_ALLOWED_ORIGINS = [
-    "http://localhost:5173",  # Add your React frontend URL
+    "http://localhost:5173",  # Your React dev server
+    "http://127.0.0.1:5173",  # Alternative localhost
+]
+
+CORS_ALLOW_CREDENTIALS = True  # Required for withCredentials
+
+# If using CSRF protection
+CSRF_TRUSTED_ORIGINS = [
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
 ]
 
 # Default primary key field type

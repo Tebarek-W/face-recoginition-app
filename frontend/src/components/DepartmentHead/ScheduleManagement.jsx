@@ -5,6 +5,7 @@ import {
   Card, 
   CardContent, 
   CardHeader, 
+  CircularProgress,
   IconButton, 
   Paper, 
   Table, 
@@ -14,34 +15,60 @@ import {
   TableHead, 
   TableRow,
   Tooltip,
-  Typography
+  Typography,
+  Alert
 } from '@mui/material';
 import { Add, Delete, Edit } from '@mui/icons-material';
 import AddScheduleDialog from './dialogs/AddScheduleDialog';
 import EditScheduleDialog from './dialogs/EditScheduleDialog';
-import  useSchedules  from '../../hooks/useSchedules';
-
+import useSchedules from '../../hooks/useSchedules';
 
 const ScheduleManagement = () => {
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState(null);
-  const { schedules, loading, error, addSchedule, updateSchedule, deleteSchedule } = useSchedules();
+  
+  // Destructure with default empty array for schedules
+  const { 
+    schedules = [], 
+    loading, 
+    error, 
+    addSchedule, 
+    updateSchedule, 
+    deleteSchedule 
+  } = useSchedules();
 
-  const handleAddSchedule = (scheduleData) => {
-    addSchedule(scheduleData);
-    setOpenAddDialog(false);
-  };
-
-  const handleEditSchedule = (scheduleData) => {
-    updateSchedule(selectedSchedule.id, scheduleData);
-    setOpenEditDialog(false);
-  };
-
-  const handleDeleteSchedule = (scheduleId) => {
-    if (window.confirm('Are you sure you want to delete this schedule?')) {
-      deleteSchedule(scheduleId);
+  const handleAddSchedule = async (scheduleData) => {
+    try {
+      await addSchedule(scheduleData);
+      setOpenAddDialog(false);
+    } catch (err) {
+      console.error('Failed to add schedule:', err);
     }
+  };
+
+  const handleEditSchedule = async (scheduleData) => {
+    try {
+      await updateSchedule(selectedSchedule.id, scheduleData);
+      setOpenEditDialog(false);
+    } catch (err) {
+      console.error('Failed to update schedule:', err);
+    }
+  };
+
+  const handleDeleteSchedule = async (scheduleId) => {
+    if (window.confirm('Are you sure you want to delete this schedule?')) {
+      try {
+        await deleteSchedule(scheduleId);
+      } catch (err) {
+        console.error('Failed to delete schedule:', err);
+      }
+    }
+  };
+
+  // Safe rendering of schedule data
+  const renderScheduleCell = (value) => {
+    return value || '-'; // Display '-' if value is null/undefined
   };
 
   return (
@@ -61,59 +88,52 @@ const ScheduleManagement = () => {
           }
         />
         <CardContent>
-          <Box sx={{ height: 400, mb: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Weekly Calendar View
-            </Typography>
-            <Paper sx={{ 
-              p: 2, 
-              height: '100%', 
-              display: 'flex', 
-              alignItems: 'center', 
-              justifyContent: 'center',
-              background: 'linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%)'
-            }}>
-              <Typography color="textSecondary">
-                Interactive calendar would be displayed here
-              </Typography>
-            </Paper>
-          </Box>
-          
-          <Typography variant="h6" gutterBottom>
-            Upcoming Classes
-          </Typography>
-          
+          {error && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error.message || 'Failed to load schedules'}
+            </Alert>
+          )}
+
           <TableContainer component={Paper} elevation={2}>
             <Table>
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ fontWeight: 600 }}>Course</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Instructor</TableCell>
+                  <TableCell sx={{ fontWeight: 600 }}>Day</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Time</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Room</TableCell>
                   <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {loading ? (
+                {loading || !Array.isArray(schedules) ? (
                   <TableRow>
-                    <TableCell colSpan={5} align="center">Loading...</TableCell>
-                  </TableRow>
-                ) : error ? (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center">Error: {error}</TableCell>
+                    <TableCell colSpan={6} align="center">
+                      <Box display="flex" alignItems="center" justifyContent="center">
+                        <CircularProgress size={24} sx={{ mr: 2 }} />
+                        <Typography>Loading schedules...</Typography>
+                      </Box>
+                    </TableCell>
                   </TableRow>
                 ) : schedules.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={5} align="center">No schedules found</TableCell>
+                    <TableCell colSpan={6} align="center">
+                      <Typography color="textSecondary">
+                        No schedules found
+                      </Typography>
+                    </TableCell>
                   </TableRow>
                 ) : (
                   schedules.map((schedule) => (
-                    <TableRow key={schedule.id}>
-                      <TableCell>{schedule.course}</TableCell>
-                      <TableCell>{schedule.instructor}</TableCell>
-                      <TableCell>{schedule.time}</TableCell>
-                      <TableCell>{schedule.room}</TableCell>
+                    <TableRow key={schedule.id || Math.random()}>
+                      <TableCell>{renderScheduleCell(schedule.course?.name)}</TableCell>
+                      <TableCell>{renderScheduleCell(schedule.instructor?.name)}</TableCell>
+                      <TableCell>{renderScheduleCell(schedule.day)}</TableCell>
+                      <TableCell>
+                        {renderScheduleCell(schedule.start_time)} - {renderScheduleCell(schedule.end_time)}
+                      </TableCell>
+                      <TableCell>{renderScheduleCell(schedule.room)}</TableCell>
                       <TableCell>
                         <Tooltip title="Edit Schedule">
                           <IconButton

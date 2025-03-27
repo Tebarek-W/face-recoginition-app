@@ -1,21 +1,35 @@
 import axios from 'axios';
 
-// Create axios instance with base configuration
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/',
+  baseURL: 'http://localhost:8000/api/',
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
-  },
-  withCredentials: true
+    'Accept': 'application/json',
+    'X-CSRFToken': getCookie('csrftoken') // Add CSRF token support
+  }
 });
 
-// Request interceptor for API calls
+// Helper function to get CSRF token
+function getCookie(name) {
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return parts.pop().split(';').shift();
+}
+
+// Request interceptor for adding auth token
 api.interceptors.request.use(
-  async (config) => {
+  (config) => {
     const token = localStorage.getItem('access_token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
+    
+    // Ensure CSRF token is always fresh
+    if (['post', 'put', 'patch', 'delete'].includes(config.method.toLowerCase())) {
+      config.headers['X-CSRFToken'] = getCookie('csrftoken');
+    }
+    
     return config;
   },
   (error) => {
@@ -23,72 +37,46 @@ api.interceptors.request.use(
   }
 );
 
-// Response interceptor for API calls
+// Enhanced response interceptor
 api.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config;
-    
-    // If unauthorized and we haven't already retried
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true;
+  (response) => {
+    // Log successful responses in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log('API Response:', {
+        url: response.config.url,
+        status: response.status,
+        data: response.data
+      });
+    }
+    return response;
+  },
+  (error) => {
+    // Enhanced error handling
+    if (error.response) {
+      const { status, data } = error.response;
       
-      try {
-        const refreshToken = localStorage.getItem('refresh_token');
-        if (!refreshToken) throw new Error('No refresh token available');
-        
-        const response = await axios.post(
-          `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api/'}auth/refresh/`,
-          { refresh: refreshToken }
-        );
-        
-        localStorage.setItem('access_token', response.data.access);
-        api.defaults.headers.common['Authorization'] = `Bearer ${response.data.access}`;
-        
-        return api(originalRequest);
-      } catch (err) {
-        // Clear tokens and redirect to login if refresh fails
-        localStorage.removeItem('access_token');
-        localStorage.removeItem('refresh_token');
-        window.location.href = '/login';
-        return Promise.reject(err);
+      console.error('API Error:', {
+        url: error.config.url,
+        status: status,
+        message: data?.detail || error.message,
+        validation: data?.errors // Handle validation errors
+      });
+
+      if (status === 401) {
+        // Handle token expiration
+        console.error('Unauthorized - please login again');
+        // Optional: Redirect to login or refresh token
+      } else if (status === 403) {
+        console.error('Forbidden - insufficient permissions');
+      } else if (status === 405) {
+        console.error('Method Not Allowed - check endpoint configuration');
       }
+    } else {
+      console.error('Network Error:', error.message);
     }
     
     return Promise.reject(error);
   }
 );
 
-// Helper functions for common HTTP methods
-const get = (url, params = {}, config = {}) => 
-  api.get(url, { params, ...config });
-
-const post = (url, data, config = {}) => 
-  api.post(url, data, config);
-
-const put = (url, data, config = {}) => 
-  api.put(url, data, config);
-
-const patch = (url, data, config = {}) => 
-  api.patch(url, data, config);
-
-const del = (url, config = {}) => 
-  api.delete(url, config);
-
-const upload = (url, formData, config = {}) => {
-  const headers = {
-    'Content-Type': 'multipart/form-data',
-    ...config.headers
-  };
-  return api.post(url, formData, { ...config, headers });
-};
-
-export default {
-  ...api,
-  get,
-  post,
-  put,
-  patch,
-  delete: del,
-  upload
-};
+export default api;

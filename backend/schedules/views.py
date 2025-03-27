@@ -1,13 +1,18 @@
-from rest_framework import viewsets, permissions
+# views.py
+from rest_framework import viewsets
 from .models import Schedule
-from .serializers import ScheduleSerializer
-from .permissions import IsHeadOfDepartment  # Custom permission to restrict access to HoD
+from .serializers import ScheduleSerializer, CreateScheduleSerializer
+from rest_framework.response import Response
 
 class ScheduleViewSet(viewsets.ModelViewSet):
     queryset = Schedule.objects.all()
-    serializer_class = ScheduleSerializer
-    permission_classes = [permissions.IsAuthenticated, IsHeadOfDepartment]
+    
+    def get_serializer_class(self):
+        if self.action in ['create', 'update', 'partial_update']:
+            return CreateScheduleSerializer
+        return ScheduleSerializer
 
-    def perform_create(self, serializer):
-        # Automatically set the course's department to the HoD's department
-        serializer.save()
+    def list(self, request):
+        queryset = self.get_queryset()
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)

@@ -1,53 +1,89 @@
 import React, { useState } from 'react';
-import { 
-  Button, 
-  Card, 
-  CardContent, 
-  CardHeader, 
-  IconButton, 
-  Paper, 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableContainer, 
-  TableHead, 
+import {
+  Box,
+  Button,
+  Card,
+  CircularProgress,
+  IconButton,
+  Paper,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
   TableRow,
-  Tooltip
+  Tooltip,
+  Typography
 } from '@mui/material';
-import { Add, Delete, Edit } from '@mui/icons-material';
+import { Add, Delete, Edit, Refresh } from '@mui/icons-material';
 import AddCourseDialog from './dialogs/AddCourseDialog';
 import EditCourseDialog from './dialogs/EditCourseDialog';
 import useCourses from '../../hooks/useCourses';
+import { useSnackbar } from 'notistack';
 
 const CourseManagement = () => {
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
-  const { courses, loading, error, addCourse, updateCourse, deleteCourse } = useCourses();
+  const { enqueueSnackbar } = useSnackbar();
+  
+  const {
+    courses = [], // Ensure courses is always an array
+    loading,
+    error,
+    addCourse,
+    updateCourse,
+    deleteCourse,
+    refresh
+  } = useCourses();
 
-  const handleAddCourse = (courseData) => {
-    addCourse(courseData);
-    setOpenAddDialog(false);
+  const handleAddCourse = async (courseData) => {
+    try {
+      await addCourse(courseData);
+      setOpenAddDialog(false);
+    } catch (error) {
+      enqueueSnackbar('Failed to add course', { variant: 'error' });
+    }
   };
 
-  const handleEditCourse = (courseData) => {
-    updateCourse(selectedCourse.id, courseData);
-    setOpenEditDialog(false);
+  const handleEditCourse = async (id, courseData) => {
+    try {
+      await updateCourse(id, courseData);
+      setOpenEditDialog(false);
+    } catch (error) {
+      enqueueSnackbar('Failed to update course', { variant: 'error' });
+    }
   };
 
-  const handleDeleteCourse = (courseId) => {
+  const handleDeleteCourse = async (id) => {
     if (window.confirm('Are you sure you want to delete this course?')) {
-      deleteCourse(courseId);
+      try {
+        await deleteCourse(id);
+        enqueueSnackbar('Course deleted successfully', { variant: 'success' });
+      } catch (error) {
+        enqueueSnackbar('Failed to delete course', { variant: 'error' });
+      }
     }
   };
 
   return (
-    <>
-      <Card>
-        <CardHeader
-          title="Course Management"
-          titleTypographyProps={{ variant: 'h5', fontWeight: 600 }}
-          action={
+    <Box sx={{ mt: 3 }}>
+      <Card elevation={3}>
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          p: 3
+        }}>
+          <Typography variant="h5" fontWeight="bold">
+            Course Management
+          </Typography>
+          <Box>
+            <Tooltip title="Refresh courses">
+              <IconButton onClick={refresh} sx={{ mr: 2 }}>
+                <Refresh />
+              </IconButton>
+            </Tooltip>
             <Button
               variant="contained"
               startIcon={<Add />}
@@ -55,85 +91,88 @@ const CourseManagement = () => {
             >
               Add Course
             </Button>
-          }
-        />
-        <CardContent>
-          <TableContainer component={Paper} elevation={2}>
-            <Table>
-              <TableHead>
+          </Box>
+        </Box>
+
+        <TableContainer component={Paper}>
+          <Table>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ fontWeight: 600 }}>Code</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Department</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading ? (
                 <TableRow>
-                  <TableCell sx={{ fontWeight: 600 }}>Course Code</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Course Name</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Instructor</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Students</TableCell>
-                  <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
+                  <TableCell colSpan={4} align="center">
+                    <CircularProgress />
+                  </TableCell>
                 </TableRow>
-              </TableHead>
-              <TableBody>
-                {loading ? (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center">Loading...</TableCell>
+              ) : error ? (
+                <TableRow>
+                  <TableCell colSpan={4} align="center" sx={{ color: 'error.main' }}>
+                    {error}
+                  </TableCell>
+                </TableRow>
+              ) : courses.length > 0 ? (
+                courses.map((course) => (
+                  <TableRow key={course.id || course._id}>
+                    <TableCell>{course.code || 'N/A'}</TableCell>
+                    <TableCell>{course.name || 'N/A'}</TableCell>
+                    <TableCell>{course.department?.name || 'N/A'}</TableCell>
+                    <TableCell>
+                      <Tooltip title="Edit Course">
+                        <IconButton
+                          color="primary"
+                          onClick={() => {
+                            setSelectedCourse(course);
+                            setOpenEditDialog(true);
+                          }}
+                        >
+                          <Edit />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete Course">
+                        <IconButton
+                          color="error"
+                          onClick={() => handleDeleteCourse(course.id || course._id)}
+                        >
+                          <Delete />
+                        </IconButton>
+                      </Tooltip>
+                    </TableCell>
                   </TableRow>
-                ) : error ? (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center">Error: {error}</TableCell>
-                  </TableRow>
-                ) : courses.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={5} align="center">No courses found</TableCell>
-                  </TableRow>
-                ) : (
-                  courses.map((course) => (
-                    <TableRow key={course.id}>
-                      <TableCell>{course.code}</TableCell>
-                      <TableCell>{course.name}</TableCell>
-                      <TableCell>{course.instructor}</TableCell>
-                      <TableCell>{course.students}</TableCell>
-                      <TableCell>
-                        <Tooltip title="Edit Course">
-                          <IconButton 
-                            color="primary" 
-                            onClick={() => {
-                              setSelectedCourse(course);
-                              setOpenEditDialog(true);
-                            }}
-                          >
-                            <Edit />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Delete Course">
-                          <IconButton 
-                            color="error"
-                            onClick={() => handleDeleteCourse(course.id)}
-                          >
-                            <Delete />
-                          </IconButton>
-                        </Tooltip>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </CardContent>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={4} align="center">
+                    No courses found
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
       </Card>
 
-      <AddCourseDialog 
-        open={openAddDialog} 
-        onClose={() => setOpenAddDialog(false)} 
-        onSubmit={handleAddCourse} 
+      <AddCourseDialog
+        open={openAddDialog}
+        onClose={() => setOpenAddDialog(false)}
+        onSubmit={handleAddCourse}
       />
 
       {selectedCourse && (
-        <EditCourseDialog 
-          open={openEditDialog} 
-          onClose={() => setOpenEditDialog(false)} 
-          onSubmit={handleEditCourse} 
+        <EditCourseDialog
+          open={openEditDialog}
+          onClose={() => setOpenEditDialog(false)}
+          onSubmit={handleEditCourse}
           course={selectedCourse}
         />
       )}
-    </>
+    </Box>
   );
 };
 

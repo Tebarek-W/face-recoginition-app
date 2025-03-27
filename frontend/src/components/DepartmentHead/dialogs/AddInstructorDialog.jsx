@@ -15,7 +15,7 @@ import {
   Avatar
 } from '@mui/material';
 import { Box } from "@mui/material";
-import  useCourses  from '../../../hooks/useCourses';
+import useCourses from '../../../hooks/useCourses';
 
 const AddInstructorDialog = ({ open, onClose, onSubmit }) => {
   const [instructorData, setInstructorData] = useState({
@@ -27,7 +27,10 @@ const AddInstructorDialog = ({ open, onClose, onSubmit }) => {
   const [avatarPreview, setAvatarPreview] = useState(null);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const { courses, loading: coursesLoading } = useCourses();
+  const { courses, loading: coursesLoading, error: coursesError } = useCourses();
+
+  // Ensure courses is always an array
+  const courseList = Array.isArray(courses) ? courses : [];
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -96,6 +99,7 @@ const AddInstructorDialog = ({ open, onClose, onSubmit }) => {
       <DialogTitle>Add New Instructor</DialogTitle>
       <DialogContent dividers>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        {coursesError && <Alert severity="error" sx={{ mb: 2 }}>Failed to load courses: {coursesError.message}</Alert>}
 
         <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
           <Avatar
@@ -161,11 +165,19 @@ const AddInstructorDialog = ({ open, onClose, onSubmit }) => {
             multiple
             value={instructorData.courseIds}
             onChange={handleCourseSelect}
+            disabled={coursesLoading || coursesError}
           >
             {coursesLoading ? (
-              <MenuItem disabled>Loading courses...</MenuItem>
+              <MenuItem disabled>
+                <CircularProgress size={20} sx={{ mr: 1 }} />
+                Loading courses...
+              </MenuItem>
+            ) : coursesError ? (
+              <MenuItem disabled>Failed to load courses</MenuItem>
+            ) : courseList.length === 0 ? (
+              <MenuItem disabled>No courses available</MenuItem>
             ) : (
-              courses.map((course) => (
+              courseList.map((course) => (
                 <MenuItem key={course.id} value={course.id}>
                   {course.name} ({course.code})
                 </MenuItem>

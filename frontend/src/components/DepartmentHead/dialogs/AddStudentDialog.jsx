@@ -15,7 +15,6 @@ import {
 } from '@mui/material';
 import useCourses from "../../../hooks/useCourses";
 
-
 const AddStudentDialog = ({ open, onClose, onSubmit }) => {
   const [studentData, setStudentData] = useState({
     firstName: '',
@@ -26,7 +25,7 @@ const AddStudentDialog = ({ open, onClose, onSubmit }) => {
   });
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
-  const { courses, loading: coursesLoading } = useCourses();
+  const { courses, loading: coursesLoading, error: coursesError } = useCourses();
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -67,11 +66,15 @@ const AddStudentDialog = ({ open, onClose, onSubmit }) => {
     }
   };
 
+  // Safe courses data handling
+  const safeCourses = Array.isArray(courses) ? courses : [];
+
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>Add New Student</DialogTitle>
       <DialogContent dividers>
         {error && <Alert severity="error" sx={{ mb: 2 }}>{error}</Alert>}
+        {coursesError && <Alert severity="error" sx={{ mb: 2 }}>Failed to load courses: {coursesError.message}</Alert>}
         
         <TextField
           autoFocus
@@ -129,9 +132,16 @@ const AddStudentDialog = ({ open, onClose, onSubmit }) => {
             onChange={handleCourseSelect}
           >
             {coursesLoading ? (
-              <MenuItem disabled>Loading courses...</MenuItem>
+              <MenuItem disabled>
+                <CircularProgress size={20} sx={{ mr: 1 }} />
+                Loading courses...
+              </MenuItem>
+            ) : coursesError ? (
+              <MenuItem disabled>Failed to load courses</MenuItem>
+            ) : safeCourses.length === 0 ? (
+              <MenuItem disabled>No courses available</MenuItem>
             ) : (
-              courses.map((course) => (
+              safeCourses.map((course) => (
                 <MenuItem key={course.id} value={course.id}>
                   {course.name} ({course.code})
                 </MenuItem>

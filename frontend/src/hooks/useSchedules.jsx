@@ -1,3 +1,4 @@
+// hooks/useSchedules.js
 import { useState, useEffect } from 'react';
 import api from '../services/api';
 
@@ -6,32 +7,27 @@ const useSchedules = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchSchedules = async () => {
-      try {
-        setLoading(true);
-        const response = await api.get('/schedules/');
-        setSchedules(response.data);
-        setError(null);
-      } catch (err) {
-        setError(err.message || 'Failed to fetch schedules');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchSchedules();
-  }, []);
+  const fetchSchedules = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/schedules/');
+      setSchedules(response.data);
+      setError(null);
+    } catch (err) {
+      setError(err.response?.data || err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const addSchedule = async (scheduleData) => {
     try {
       setLoading(true);
       const response = await api.post('/schedules/', scheduleData);
       setSchedules(prev => [...prev, response.data]);
-      setError(null);
       return response.data;
     } catch (err) {
-      setError(err.message || 'Failed to add schedule');
+      setError(err.response?.data || err.message);
       throw err;
     } finally {
       setLoading(false);
@@ -42,13 +38,10 @@ const useSchedules = () => {
     try {
       setLoading(true);
       const response = await api.put(`/schedules/${id}/`, scheduleData);
-      setSchedules(prev => prev.map(schedule => 
-        schedule.id === id ? response.data : schedule
-      ));
-      setError(null);
+      setSchedules(prev => prev.map(s => s.id === id ? response.data : s));
       return response.data;
     } catch (err) {
-      setError(err.message || 'Failed to update schedule');
+      setError(err.response?.data || err.message);
       throw err;
     } finally {
       setLoading(false);
@@ -59,23 +52,27 @@ const useSchedules = () => {
     try {
       setLoading(true);
       await api.delete(`/schedules/${id}/`);
-      setSchedules(prev => prev.filter(schedule => schedule.id !== id));
-      setError(null);
+      setSchedules(prev => prev.filter(s => s.id !== id));
     } catch (err) {
-      setError(err.message || 'Failed to delete schedule');
+      setError(err.response?.data || err.message);
       throw err;
     } finally {
       setLoading(false);
     }
   };
 
-  return { 
-    schedules, 
-    loading, 
-    error, 
-    addSchedule, 
-    updateSchedule, 
-    deleteSchedule 
+  useEffect(() => {
+    fetchSchedules();
+  }, []);
+
+  return {
+    schedules,
+    loading,
+    error,
+    addSchedule,
+    updateSchedule,
+    deleteSchedule,
+    refresh: fetchSchedules
   };
 };
 

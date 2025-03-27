@@ -22,8 +22,8 @@ const useAttendance = () => {
         
         // Fetch analytics and rules in parallel
         const [analyticsResponse, rulesResponse] = await Promise.all([
-          api.get('/attendance/analytics/'),
-          api.get('/attendance/rules/')
+          api.get('/analytics/attendance/analytics/'),  // Removed /api/
+          api.get('/analytics/attendance/rules/')       // Removed /api/
         ]);
 
         setAttendanceData({
@@ -45,7 +45,7 @@ const useAttendance = () => {
   const updateRules = async (newRules) => {
     try {
       setLoading(true);
-      const response = await api.put('/attendance/rules/', newRules);
+      const response = await api.put('/analytics/attendance/rules/', newRules); // Fixed path
       setAttendanceData(prev => ({
         ...prev,
         rules: response.data

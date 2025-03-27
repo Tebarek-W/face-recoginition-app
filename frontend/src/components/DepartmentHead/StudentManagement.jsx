@@ -28,7 +28,11 @@ const StudentManagement = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const { students, loading, error, addStudent, bulkEnroll } = useStudents();
 
-  const filteredStudents = students.filter(student =>
+  // Ensure that students is an array, even if it's empty initially
+  const safeStudents = Array.isArray(students) ? students : [];
+
+  // Filter students based on search term
+  const filteredStudents = safeStudents.filter(student =>
     student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     student.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     student.id.toLowerCase().includes(searchTerm.toLowerCase())
