@@ -2,12 +2,16 @@ from django.db import models
 from departments.models import Department
 from instructors.models import Instructor
 
+# models.py
 class Course(models.Model):
     department = models.ForeignKey(
-        Department, 
-        on_delete=models.CASCADE, 
+        Department,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
         related_name='courses'
     )
+    # other fields...
     instructor = models.ForeignKey(
         Instructor,
         on_delete=models.SET_NULL,
@@ -15,11 +19,9 @@ class Course(models.Model):
         blank=True,
         related_name='courses'
     )
-    name = models.CharField(max_length=100)
     code = models.CharField(max_length=10, unique=True)
-    description = models.TextField(blank=True, default='')
+    name = models.CharField(max_length=100)
     credit_hours = models.PositiveSmallIntegerField(default=3)
-    is_active = models.BooleanField(default=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

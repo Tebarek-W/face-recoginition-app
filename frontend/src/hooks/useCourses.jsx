@@ -8,22 +8,36 @@ const useCourses = () => {
   const [error, setError] = useState(null);
   const { enqueueSnackbar } = useSnackbar();
 
+  const showSnackbar = (message, variant = 'success') => {
+    enqueueSnackbar(message, { 
+      variant,
+      autoHideDuration: variant === 'error' ? 5000 : 3000,
+      anchorOrigin: {
+        vertical: 'top',
+        horizontal: 'center'
+      }
+    });
+  };
+
   const fetchCourses = async () => {
     try {
       setLoading(true);
-      const response = await api.get('/courses/');
-      setCourses(response.data);
+      setError(null);
+      const response = await api.get('courses/');
+      setCourses(response.data || []);
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to fetch courses');
-      enqueueSnackbar('Failed to load courses', { variant: 'error' });
+      console.error('Fetch courses error:', err);
+      const errorMessage = err.response?.data?.detail || 
+                         err.response?.data?.message || 
+                         'Failed to fetch courses';
+      setError(errorMessage);
+      showSnackbar(errorMessage, 'error');
     } finally {
       setLoading(false);
     }
   };
 
-  // Add refresh function
   const refresh = () => {
-    setError(null);
     fetchCourses();
   };
 
@@ -34,13 +48,17 @@ const useCourses = () => {
   const addCourse = async (courseData) => {
     try {
       setLoading(true);
-      const response = await api.post('/courses/', courseData);
+      const response = await api.post('courses/', courseData);
       setCourses(prev => [...prev, response.data]);
-      enqueueSnackbar('Course added successfully', { variant: 'success' });
+      showSnackbar('Course added successfully');
       return response.data;
     } catch (err) {
-      const errorMsg = err.response?.data?.message || 'Failed to add course';
-      enqueueSnackbar(errorMsg, { variant: 'error' });
+      console.error('Add course error:', err);
+      const errorMessage = err.response?.data?.detail || 
+                         err.response?.data?.message || 
+                         Object.values(err.response?.data || {})[0]?.[0] || 
+                         'Failed to add course';
+      showSnackbar(errorMessage, 'error');
       throw err;
     } finally {
       setLoading(false);
@@ -50,16 +68,51 @@ const useCourses = () => {
   const updateCourse = async (id, courseData) => {
     try {
       setLoading(true);
-      const response = await api.patch(`/courses/${id}/`, courseData);
+      console.log('Updating course:', id, courseData); // Debug log
+      
+      // Clean the data by removing undefined values
+      const cleanData = Object.fromEntries(
+        Object.entries(courseData).filter(([_, v]) => v !== undefined)
+      );
+      
+      console.log('Cleaned data for API:', cleanData); // Debug log
+      
+      const response = await api.patch(`courses/${id}/`, cleanData);
+      
       setCourses(prev => prev.map(c => 
-        c.id === id ? response.data : c
+        c.id === id ? { ...c, ...response.data } : c
       ));
-      enqueueSnackbar('Course updated successfully', { variant: 'success' });
+      
+      enqueueSnackbar('Course updated successfully', { 
+        variant: 'success',
+        autoHideDuration: 3000
+      });
+      
       return response.data;
-    } catch (err) {
-      const errorMsg = err.response?.data?.message || 'Failed to update course';
-      enqueueSnackbar(errorMsg, { variant: 'error' });
-      throw err;
+    } catch (error) {
+      console.error('Update failed:', {
+        status: error.response?.status,
+        data: error.response?.data,
+        config: error.config
+      });
+      
+      let errorMessage = 'Failed to update course';
+      if (error.response?.data) {
+        if (error.response.data.detail) {
+          errorMessage = error.response.data.detail;
+        } else if (typeof error.response.data === 'object') {
+          errorMessage = Object.entries(error.response.data)
+            .map(([field, errors]) => `${field}: ${Array.isArray(errors) ? errors.join(', ') : errors}`)
+            .join(' | ');
+        }
+      }
+      
+      enqueueSnackbar(errorMessage, { 
+        variant: 'error',
+        autoHideDuration: 5000
+      });
+      
+      throw error;
     } finally {
       setLoading(false);
     }
@@ -68,12 +121,15 @@ const useCourses = () => {
   const deleteCourse = async (id) => {
     try {
       setLoading(true);
-      await api.delete(`/courses/${id}/`);
+      await api.delete(`courses/${id}/`);
       setCourses(prev => prev.filter(c => c.id !== id));
-      enqueueSnackbar('Course deleted successfully', { variant: 'success' });
+      showSnackbar('Course deleted successfully');
     } catch (err) {
-      const errorMsg = err.response?.data?.message || 'Failed to delete course';
-      enqueueSnackbar(errorMsg, { variant: 'error' });
+      console.error('Delete course error:', err);
+      const errorMessage = err.response?.data?.detail || 
+                         err.response?.data?.message || 
+                         'Failed to delete course';
+      showSnackbar(errorMessage, 'error');
       throw err;
     } finally {
       setLoading(false);
@@ -87,7 +143,8 @@ const useCourses = () => {
     addCourse, 
     updateCourse, 
     deleteCourse,
-    refresh 
+    refresh,
+    fetchCourses 
   };
 };
 

@@ -10,14 +10,16 @@ class Instructor(models.Model):
     )
     department = models.ForeignKey(
         Department, 
-        on_delete=models.CASCADE, 
-        related_name='instructors'
+        on_delete=models.SET_NULL,  # Changed from CASCADE to SET_NULL
+        related_name='instructors',
+        null=True,      # Allows NULL in the database
+        blank=True,     # Allows empty in forms/admin
     )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     def __str__(self):
-        return f"{self.user.first_name} {self.user.last_name}"  # More readable than username
+        return f"{self.user.first_name} {self.user.last_name}"
 
     @property
     def email(self):

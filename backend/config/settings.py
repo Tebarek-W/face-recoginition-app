@@ -24,8 +24,8 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',  # Add this
-    'authentication',
     'users',
+    'analytics',
     'departments',
     'schedules',
     'attendance',
@@ -121,6 +121,13 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.AllowAny',  # Allow access to all endpoints by default
     ],
 }
+REST_FRAMEWORK = {
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',
+        'rest_framework.parsers.FormParser',
+        'rest_framework.parsers.MultiPartParser'
+    ]
+}
 
 # JWT settings
 SIMPLE_JWT = {
@@ -156,7 +163,7 @@ CORS_ALLOW_ALL_ORIGINS = True  # Allow all origins (for development only)
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",  # Your React dev server
-    "http://127.0.0.1:5173",  # Alternative localhost
+    
 ]
 
 CORS_ALLOW_CREDENTIALS = True  # Required for withCredentials
@@ -164,7 +171,7 @@ CORS_ALLOW_CREDENTIALS = True  # Required for withCredentials
 # If using CSRF protection
 CSRF_TRUSTED_ORIGINS = [
     "http://localhost:5173",
-    "http://127.0.0.1:5173",
+    
 ]
 
 # Default primary key field type

@@ -3,69 +3,100 @@ import api from '../services/api';
 
 const useAttendance = () => {
   const [attendanceData, setAttendanceData] = useState({
-    analytics: [],
-    rules: {
-      minimumAttendance: 75,
-      latePolicy: 3,
-      notificationThreshold: 70,
-      gracePeriod: 15
-    }
+    analytics: null,
+    rules: null
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Fetch attendance data and rules
-  useEffect(() => {
-    const fetchAttendanceData = async () => {
-      try {
-        setLoading(true);
-        
-        // Fetch analytics and rules in parallel
-        const [analyticsResponse, rulesResponse] = await Promise.all([
-          api.get('/analytics/attendance/analytics/'),  // Removed /api/
-          api.get('/analytics/attendance/rules/')       // Removed /api/
-        ]);
-
-        setAttendanceData({
-          analytics: analyticsResponse.data,
-          rules: rulesResponse.data
-        });
-        setError(null);
-      } catch (err) {
-        setError(err.message || 'Failed to fetch attendance data');
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAttendanceData();
-  }, []);
-
-  // Update attendance rules
-  const updateRules = async (newRules) => {
+  const fetchAttendanceData = async () => {
     try {
       setLoading(true);
-      const response = await api.put('/analytics/attendance/rules/', newRules); // Fixed path
-      setAttendanceData(prev => ({
-        ...prev,
-        rules: response.data
-      }));
       setError(null);
-      return response.data;
+      
+      const [analyticsResponse, rulesResponse] = await Promise.all([
+        api.get('/analytics/attendance/analytics/'),
+        api.get('/analytics/attendance/rules/')
+      ]);
+
+      setAttendanceData({
+        analytics: analyticsResponse.data,
+        rules: transformRulesResponse(rulesResponse.data)
+      });
     } catch (err) {
-      setError(err.message || 'Failed to update attendance rules');
-      throw err;
+      const errorData = err.response?.data;
+      const errorMessage = errorData?.detail || 
+                         errorData?.message || 
+                         err.message || 
+                         'Failed to fetch attendance data';
+      
+      setError(errorMessage);
+      console.error('Attendance fetch error:', {
+        error: err,
+        response: err.response
+      });
     } finally {
       setLoading(false);
     }
   };
+
+  const transformRulesResponse = (data) => ({
+    minimumAttendance: data.minimum_attendance,
+    latePolicy: data.late_policy,
+    notificationThreshold: data.notification_threshold,
+    gracePeriod: data.grace_period
+  });
+
+  const updateRules = async (newRules) => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      const payload = {
+        minimum_attendance: Number(newRules.minimumAttendance),
+        late_policy: Number(newRules.latePolicy),
+        notification_threshold: Number(newRules.notificationThreshold),
+        grace_period: Number(newRules.gracePeriod)
+      };
+
+      const response = await api.put('/analytics/attendance/rules/', payload);
+
+      setAttendanceData(prev => ({
+        ...prev,
+        rules: transformRulesResponse(response.data)
+      }));
+      
+      return response.data;
+    } catch (err) {
+      const errorData = err.response?.data;
+      const errorMessage = errorData?.detail || 
+                         errorData?.message || 
+                         err.message || 
+                         'Failed to update attendance rules';
+      
+      setError(errorMessage);
+      console.error('Rules update error:', {
+        error: err,
+        response: err.response,
+        config: err.config
+      });
+      throw errorMessage;
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAttendanceData();
+  }, []);
 
   return { 
     analytics: attendanceData.analytics,
     rules: attendanceData.rules,
     loading, 
     error, 
-    updateRules 
+    updateRules,
+    refetch: fetchAttendanceData
   };
 };
 

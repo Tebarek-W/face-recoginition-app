@@ -1,10 +1,10 @@
 from rest_framework import serializers
 from .models import Student
-from authentication.serializers import UserSerializer  # Assuming you have a UserSerializer
+from users.serializers import UserBasicSerializer  # Assuming you have a UserSerializer
 from departments.serializers import DepartmentSerializer  # Assuming you have a DepartmentSerializer
 
 class StudentSerializer(serializers.ModelSerializer):
-    user = UserSerializer(read_only=True)  # Nested serializer for user details
+    user = UserBasicSerializer(read_only=True)  # Nested serializer for user details
     department = DepartmentSerializer(read_only=True)  # Nested serializer for department details
 
     class Meta:

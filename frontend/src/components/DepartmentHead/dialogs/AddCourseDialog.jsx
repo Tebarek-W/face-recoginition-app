@@ -12,36 +12,39 @@ import {
   MenuItem,
   Grid,
   CircularProgress,
-  Alert,
-  Checkbox,
-  FormControlLabel
+  Alert
 } from '@mui/material';
-import useInstructors from "../../../hooks/useInstructors";
+import useDepartment from "../../../hooks/useDepartment";
 
 const AddCourseDialog = ({ open, onClose, onSubmit }) => {
   const [courseData, setCourseData] = useState({
     code: '',
     name: '',
-    description: '',
     credit_hours: 3,
-    instructor: '',
-    is_active: true
+    department: null
   });
+  
   const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
-  const { instructors, loading: instructorsLoading, error: instructorsError } = useInstructors();
+  
+  // Destructure the hook response properly
+  const { 
+    departments: departmentResponse, 
+    loading: departmentsLoading, 
+    error: departmentsError 
+  } = useDepartment();
 
-  // Reset form when opening/closing dialog
+  // Extract departments array from response (handles various API structures)
+  const departments = departmentResponse?.data || departmentResponse?.departments || departmentResponse || [];
+
   useEffect(() => {
     if (open) {
       setCourseData({
         code: '',
         name: '',
-        description: '',
         credit_hours: 3,
-        instructor: '',
-        is_active: true
+        department: null
       });
       setErrors({});
       setSubmitError(null);
@@ -60,10 +63,10 @@ const AddCourseDialog = ({ open, onClose, onSubmit }) => {
   };
 
   const handleChange = (e) => {
-    const { name, value, type, checked } = e.target;
+    const { name, value } = e.target;
     setCourseData(prev => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value
+      [name]: value === '' ? null : value
     }));
   };
 
@@ -74,23 +77,21 @@ const AddCourseDialog = ({ open, onClose, onSubmit }) => {
     setSubmitError(null);
     
     try {
-      await onSubmit({
-        ...courseData,
+      const submissionData = {
         code: courseData.code.trim(),
         name: courseData.name.trim(),
-        description: courseData.description.trim()
-      });
+        credit_hours: Number(courseData.credit_hours),
+        department_id: courseData.department || null
+      };
+      
+      await onSubmit(submissionData);
       onClose();
     } catch (error) {
-      console.error('Failed to add course:', error);
-      setSubmitError(error.message || 'Failed to add course. Please try again.');
+      setSubmitError(error.response?.data?.message || error.message || 'Failed to add course. Please try again.');
     } finally {
       setSubmitting(false);
     }
   };
-
-  // Safe instructor list handling
-  const instructorList = Array.isArray(instructors) ? instructors : [];
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
@@ -101,10 +102,10 @@ const AddCourseDialog = ({ open, onClose, onSubmit }) => {
             {submitError}
           </Alert>
         )}
-        
-        {instructorsError && (
+
+        {departmentsError && (
           <Alert severity="warning" sx={{ mb: 2 }}>
-            Could not load instructors: {instructorsError.message}
+            {departmentsError}
           </Alert>
         )}
 
@@ -150,59 +151,25 @@ const AddCourseDialog = ({ open, onClose, onSubmit }) => {
             />
           </Grid>
           <Grid item xs={12} sm={6}>
-            <FormControl fullWidth margin="normal" error={!!errors.instructor}>
-              <InputLabel>Instructor</InputLabel>
+            <FormControl fullWidth margin="normal">
+              <InputLabel>Department (Optional)</InputLabel>
               <Select
-                name="instructor"
-                value={courseData.instructor}
+                name="department"
+                value={courseData.department || ''}
                 onChange={handleChange}
-                label="Instructor"
-                disabled={instructorsLoading || instructorsError}
+                label="Department (Optional)"
+                disabled={departmentsLoading}
               >
-                <MenuItem value="">None</MenuItem>
-                {instructorsLoading ? (
-                  <MenuItem disabled>
-                    <CircularProgress size={20} sx={{ mr: 1 }} />
-                    Loading instructors...
+                <MenuItem value="">
+                  <em>None</em>
+                </MenuItem>
+                {Array.isArray(departments) && departments.map((dept) => (
+                  <MenuItem key={dept.id} value={dept.id}>
+                    {dept.name}
                   </MenuItem>
-                ) : instructorList.length === 0 ? (
-                  <MenuItem disabled>No instructors available</MenuItem>
-                ) : (
-                  instructorList.map((instructor) => (
-                    <MenuItem key={instructor.id} value={instructor.id}>
-                      {instructor.name} ({instructor.email})
-                    </MenuItem>
-                  ))
-                )}
+                ))}
               </Select>
             </FormControl>
-          </Grid>
-          <Grid item xs={12}>
-            <TextField
-              fullWidth
-              label="Description"
-              name="description"
-              multiline
-              rows={4}
-              value={courseData.description}
-              onChange={handleChange}
-              margin="normal"
-              inputProps={{ maxLength: 500 }}
-              helperText={`${courseData.description.length}/500 characters`}
-            />
-          </Grid>
-          <Grid item xs={12}>
-            <FormControlLabel
-              control={
-                <Checkbox
-                  name="is_active"
-                  checked={courseData.is_active}
-                  onChange={handleChange}
-                  color="primary"
-                />
-              }
-              label="Active Course"
-            />
           </Grid>
         </Grid>
       </DialogContent>

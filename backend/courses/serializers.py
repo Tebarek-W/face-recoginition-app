@@ -1,53 +1,51 @@
 from rest_framework import serializers
 from .models import Course
-from instructors.serializers import InstructorBasicSerializer
-from departments.serializers import DepartmentBasicSerializer
-
-class CourseReadSerializer(serializers.ModelSerializer):
-    instructor_details = InstructorBasicSerializer(
-        source='instructor', 
-        read_only=True
-    )
-    department_details = DepartmentBasicSerializer(
-        source='department',
-        read_only=True
-    )
-    
-    class Meta:
-        model = Course
-        fields = [
-            'id',
-            'code',
-            'name',
-            'description',
-            'credit_hours',
-            'is_active',
-            'department',
-            'department_details',
-            'instructor',
-            'instructor_details',
-            'created_at',
-            'updated_at'
-        ]
-        extra_kwargs = {
-            'department': {'write_only': True},
-            'instructor': {'write_only': True},
-            'created_at': {'read_only': True},
-            'updated_at': {'read_only': True}
-        }
+from departments.models import Department
 
 class CourseWriteSerializer(serializers.ModelSerializer):
+    department_id = serializers.IntegerField(
+        required=False,
+        allow_null=True,
+        write_only=True
+    )
+
+    class Meta:
+        model = Course
+        fields = ['code', 'name', 'credit_hours', 'department_id']
+        extra_kwargs = {
+            'code': {'required': True, 'allow_blank': False},
+            'name': {'required': True, 'allow_blank': False},
+            'credit_hours': {
+                'required': True,
+                'min_value': 1,
+                'max_value': 6
+            }
+        }
+
+    def validate_department_id(self, value):
+        if value is None:
+            return None
+        if not Department.objects.filter(pk=value).exists():
+            raise serializers.ValidationError("Department does not exist")
+        return value
+
+class CourseReadSerializer(serializers.ModelSerializer):
+    department_id = serializers.IntegerField(
+        source='department.id', 
+        allow_null=True,
+        read_only=True
+    )
+    department_name = serializers.CharField(
+        source='department.name',
+        allow_null=True,
+        read_only=True
+    )
+
     class Meta:
         model = Course
         fields = [
-            'code',
-            'name',
-            'description',
-            'credit_hours',
-            'is_active',
-            'department',
-            'instructor'
+            'id', 'code', 'name', 'credit_hours',
+            'department_id', 'department_name',
+            'created_at', 'updated_at'
         ]
-
-# Temporary backward compatibility (remove after updating all references)
-CourseSerializer = CourseReadSerializer
+        read_only_fields = fields

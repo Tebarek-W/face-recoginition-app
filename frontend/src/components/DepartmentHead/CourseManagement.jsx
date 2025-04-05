@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Button,
@@ -25,10 +25,11 @@ const CourseManagement = () => {
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [selectedCourse, setSelectedCourse] = useState(null);
+  const [ariaHidden, setAriaHidden] = useState(false);
   const { enqueueSnackbar } = useSnackbar();
   
   const {
-    courses = [], // Ensure courses is always an array
+    courses = [],
     loading,
     error,
     addCourse,
@@ -37,12 +38,23 @@ const CourseManagement = () => {
     refresh
   } = useCourses();
 
+  // Handle dialog state changes for accessibility
+  useEffect(() => {
+    // Set aria-hidden on root when any dialog is open
+    const rootElement = document.getElementById('root');
+    if (rootElement) {
+      rootElement.setAttribute('aria-hidden', ariaHidden.toString());
+      rootElement.inert = ariaHidden;
+    }
+  }, [ariaHidden]);
+
   const handleAddCourse = async (courseData) => {
     try {
       await addCourse(courseData);
       setOpenAddDialog(false);
+      enqueueSnackbar('Course added successfully', { variant: 'success' });
     } catch (error) {
-      enqueueSnackbar('Failed to add course', { variant: 'error' });
+      enqueueSnackbar(error.message || 'Failed to add course', { variant: 'error' });
     }
   };
 
@@ -50,8 +62,9 @@ const CourseManagement = () => {
     try {
       await updateCourse(id, courseData);
       setOpenEditDialog(false);
+      enqueueSnackbar('Course updated successfully', { variant: 'success' });
     } catch (error) {
-      enqueueSnackbar('Failed to update course', { variant: 'error' });
+      enqueueSnackbar(error.message || 'Failed to update course', { variant: 'error' });
     }
   };
 
@@ -61,8 +74,26 @@ const CourseManagement = () => {
         await deleteCourse(id);
         enqueueSnackbar('Course deleted successfully', { variant: 'success' });
       } catch (error) {
-        enqueueSnackbar('Failed to delete course', { variant: 'error' });
+        enqueueSnackbar(error.message || 'Failed to delete course', { variant: 'error' });
       }
+    }
+  };
+
+  const handleDialogOpen = (dialogType) => {
+    setAriaHidden(true);
+    if (dialogType === 'add') {
+      setOpenAddDialog(true);
+    } else {
+      setOpenEditDialog(true);
+    }
+  };
+
+  const handleDialogClose = (dialogType) => {
+    setAriaHidden(false);
+    if (dialogType === 'add') {
+      setOpenAddDialog(false);
+    } else {
+      setOpenEditDialog(false);
     }
   };
 
@@ -80,14 +111,19 @@ const CourseManagement = () => {
           </Typography>
           <Box>
             <Tooltip title="Refresh courses">
-              <IconButton onClick={refresh} sx={{ mr: 2 }}>
+              <IconButton 
+                onClick={refresh} 
+                sx={{ mr: 2 }}
+                aria-label="Refresh courses"
+              >
                 <Refresh />
               </IconButton>
             </Tooltip>
             <Button
               variant="contained"
               startIcon={<Add />}
-              onClick={() => setOpenAddDialog(true)}
+              onClick={() => handleDialogOpen('add')}
+              aria-label="Add new course"
             >
               Add Course
             </Button>
@@ -95,26 +131,27 @@ const CourseManagement = () => {
         </Box>
 
         <TableContainer component={Paper}>
-          <Table>
+          <Table aria-label="Courses table">
             <TableHead>
               <TableRow>
                 <TableCell sx={{ fontWeight: 600 }}>Code</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Name</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Department</TableCell>
+                <TableCell sx={{ fontWeight: 600 }}>Credit Hours</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={4} align="center">
-                    <CircularProgress />
+                  <TableCell colSpan={5} align="center">
+                    <CircularProgress aria-label="Loading" />
                   </TableCell>
                 </TableRow>
               ) : error ? (
                 <TableRow>
-                  <TableCell colSpan={4} align="center" sx={{ color: 'error.main' }}>
-                    {error}
+                  <TableCell colSpan={5} align="center" sx={{ color: 'error.main' }}>
+                    {error.message || 'Error loading courses'}
                   </TableCell>
                 </TableRow>
               ) : courses.length > 0 ? (
@@ -123,14 +160,16 @@ const CourseManagement = () => {
                     <TableCell>{course.code || 'N/A'}</TableCell>
                     <TableCell>{course.name || 'N/A'}</TableCell>
                     <TableCell>{course.department?.name || 'N/A'}</TableCell>
+                    <TableCell>{course.credit_hours || 'N/A'}</TableCell>
                     <TableCell>
                       <Tooltip title="Edit Course">
                         <IconButton
                           color="primary"
                           onClick={() => {
                             setSelectedCourse(course);
-                            setOpenEditDialog(true);
+                            handleDialogOpen('edit');
                           }}
+                          aria-label={`Edit ${course.name}`}
                         >
                           <Edit />
                         </IconButton>
@@ -139,6 +178,7 @@ const CourseManagement = () => {
                         <IconButton
                           color="error"
                           onClick={() => handleDeleteCourse(course.id || course._id)}
+                          aria-label={`Delete ${course.name}`}
                         >
                           <Delete />
                         </IconButton>
@@ -148,7 +188,7 @@ const CourseManagement = () => {
                 ))
               ) : (
                 <TableRow>
-                  <TableCell colSpan={4} align="center">
+                  <TableCell colSpan={5} align="center">
                     No courses found
                   </TableCell>
                 </TableRow>
@@ -160,15 +200,15 @@ const CourseManagement = () => {
 
       <AddCourseDialog
         open={openAddDialog}
-        onClose={() => setOpenAddDialog(false)}
+        onClose={() => handleDialogClose('add')}
         onSubmit={handleAddCourse}
       />
 
       {selectedCourse && (
         <EditCourseDialog
           open={openEditDialog}
-          onClose={() => setOpenEditDialog(false)}
-          onSubmit={handleEditCourse}
+          onClose={() => handleDialogClose('edit')}
+          onSubmit={(data) => handleEditCourse(selectedCourse.id || selectedCourse._id, data)}
           course={selectedCourse}
         />
       )}

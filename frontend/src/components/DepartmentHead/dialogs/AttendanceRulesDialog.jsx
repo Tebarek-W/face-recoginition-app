@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -7,7 +7,8 @@ import {
   Button,
   TextField,
   Typography,
-  CircularProgress
+  CircularProgress,
+  Alert
 } from '@mui/material';
 
 const AttendanceRulesDialog = ({ open, onClose, onSubmit, initialRules }) => {
@@ -18,29 +19,57 @@ const AttendanceRulesDialog = ({ open, onClose, onSubmit, initialRules }) => {
     gracePeriod: 15
   });
   const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState(null);
+  const saveButtonRef = useRef(null);
+
+  // Manage focus when dialog opens
+  useEffect(() => {
+    if (open && saveButtonRef.current) {
+      saveButtonRef.current.focus();
+    }
+  }, [open]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setRules(prev => ({
       ...prev,
-      [name]: value
+      [name]: Number(value) // Ensure numeric values
     }));
+    setError(null); // Clear error on change
   };
 
   const handleSubmit = async () => {
     setSubmitting(true);
+    setError(null);
     try {
       await onSubmit(rules);
       onClose();
+    } catch (err) {
+      console.error('Failed to save rules:', err);
+      setError(err.message || 'Failed to save attendance rules');
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-      <DialogTitle>Configure Attendance Rules</DialogTitle>
+    <Dialog 
+      open={open} 
+      onClose={onClose} 
+      fullWidth 
+      maxWidth="sm"
+      aria-labelledby="attendance-rules-title"
+    >
+      <DialogTitle id="attendance-rules-title">
+        Configure Attendance Rules
+      </DialogTitle>
       <DialogContent dividers>
+        {error && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {error}
+          </Alert>
+        )}
+
         <Typography variant="subtitle1" gutterBottom>
           Set the rules for attendance tracking and notifications
         </Typography>
@@ -114,6 +143,7 @@ const AttendanceRulesDialog = ({ open, onClose, onSubmit, initialRules }) => {
           Cancel
         </Button>
         <Button 
+          ref={saveButtonRef}
           onClick={handleSubmit} 
           variant="contained" 
           disabled={submitting}

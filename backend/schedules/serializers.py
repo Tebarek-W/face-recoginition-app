@@ -1,8 +1,8 @@
 # serializers.py
 from rest_framework import serializers
 from .models import Schedule
-from courses.serializers import CourseSerializer
-from instructors.serializers import InstructorSerializer
+from courses.serializers import CourseReadSerializer as CourseSerializer
+from instructors.serializers import InstructorReadSerializer as InstructorSerializer
 
 class ScheduleSerializer(serializers.ModelSerializer):
     course = CourseSerializer(read_only=True)

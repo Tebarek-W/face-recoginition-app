@@ -7,19 +7,38 @@ import {
   CardHeader, 
   Grid, 
   Paper, 
-  Typography 
+  Typography,
+  CircularProgress,
+  Alert
 } from '@mui/material';
 import AttendanceRulesDialog from './dialogs/AttendanceRulesDialog';
 import AttendanceChart from './shared/AttendanceChart';
-import  useAttendance  from '../../hooks/useAttendance';
+import useAttendance from '../../hooks/useAttendance';
 
 const AttendanceManagement = () => {
   const [openRulesDialog, setOpenRulesDialog] = useState(false);
-  const { rules, analytics, loading, error, updateRules } = useAttendance();
+  const [successMessage, setSuccessMessage] = useState('');
+  const { 
+    rules, 
+    analytics, 
+    loading, 
+    error, 
+    updateRules,
+    refetch
+  } = useAttendance();
 
-  const handleUpdateRules = (newRules) => {
-    updateRules(newRules);
-    setOpenRulesDialog(false);
+  const handleUpdateRules = async (newRules) => {
+    try {
+      const success = await updateRules(newRules);
+      if (success) {
+        setSuccessMessage('Attendance rules updated successfully!');
+        setTimeout(() => setSuccessMessage(''), 3000);
+        setOpenRulesDialog(false);
+        refetch(); // Refresh data after successful update
+      }
+    } catch (err) {
+      // Error is already handled in the useAttendance hook
+    }
   };
 
   return (
@@ -32,21 +51,30 @@ const AttendanceManagement = () => {
             <Button
               variant="contained"
               onClick={() => setOpenRulesDialog(true)}
+              disabled={loading}
             >
               Configure Rules
             </Button>
           }
         />
         <CardContent>
-          {loading ? (
-            <Box textAlign="center" py={4}>
-              <Typography>Loading attendance data...</Typography>
+          {loading && !rules ? (
+            <Box display="flex" justifyContent="center" py={4}>
+              <CircularProgress />
             </Box>
           ) : error ? (
-            <Box textAlign="center" py={4}>
-              <Typography color="error">Error: {error}</Typography>
-            </Box>
-          ) : (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {error}
+            </Alert>
+          ) : null}
+
+          {successMessage && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              {successMessage}
+            </Alert>
+          )}
+
+          {rules && (
             <Grid container spacing={3}>
               <Grid item xs={12} md={6}>
                 <Typography variant="h6" gutterBottom>
@@ -79,24 +107,33 @@ const AttendanceManagement = () => {
                 <Typography variant="h6" gutterBottom>
                   Attendance Statistics
                 </Typography>
-                <AttendanceChart 
-                  type="bar" 
-                  data={analytics}
-                  height={200}
-                  showLegend={false}
-                />
+                {analytics ? (
+                  <AttendanceChart 
+                    type="bar" 
+                    data={analytics}
+                    height={200}
+                    showLegend={false}
+                  />
+                ) : (
+                  <Box textAlign="center" py={4}>
+                    <Typography>No attendance data available</Typography>
+                  </Box>
+                )}
               </Grid>
             </Grid>
           )}
         </CardContent>
       </Card>
 
-      <AttendanceRulesDialog 
-        open={openRulesDialog} 
-        onClose={() => setOpenRulesDialog(false)} 
-        onSubmit={handleUpdateRules} 
-        initialRules={rules}
-      />
+      {rules && (
+        <AttendanceRulesDialog 
+          open={openRulesDialog} 
+          onClose={() => setOpenRulesDialog(false)} 
+          onSubmit={handleUpdateRules} 
+          initialRules={rules}
+          isLoading={loading}
+        />
+      )}
     </>
   );
 };
