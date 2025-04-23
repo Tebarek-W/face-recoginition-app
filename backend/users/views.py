@@ -22,7 +22,7 @@ class UserViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['get'])
     def get_heads(self, request):
-        heads = User.objects.filter(role='HEAD').only('id', 'name')
+        heads = User.objects.filter(role='HEAD').only('id', 'first_name', 'last_name')
         serializer = self.get_serializer(heads, many=True)
         return Response(serializer.data)
 

@@ -21,8 +21,8 @@ const AddScheduleDialog = ({ open, onClose, onSubmit }) => {
     course: '',
     instructor: '',
     day: '',
-    startTime: '',
-    endTime: '',
+    start_time: '',
+    end_time: '',
     room: ''
   });
   
@@ -31,13 +31,7 @@ const AddScheduleDialog = ({ open, onClose, onSubmit }) => {
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
-  const daysOfWeek = [
-    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'
-  ];
-
-  // Ensure courses and instructors are always arrays with fallback keys
-  const courseList = Array.isArray(courses) ? courses : [];
-  const instructorList = Array.isArray(instructors) ? instructors : [];
+  const daysOfWeek = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -48,164 +42,170 @@ const AddScheduleDialog = ({ open, onClose, onSubmit }) => {
     setSubmitError(null); // Clear errors on change
   };
 
+  const formatTimeForBackend = (time) => {
+    if (!time) return '';
+    // Ensure time is in HH:MM:SS format
+    const parts = String(time).split(':');
+    if (parts.length === 2) return `${time}:00`;
+    if (parts.length === 3) return time;
+    return time;
+  };
+
   const handleSubmit = async () => {
+    // Validate required fields
+    if (!scheduleData.course || !scheduleData.instructor || !scheduleData.day || 
+        !scheduleData.start_time || !scheduleData.end_time) {
+      setSubmitError('Please fill all required fields');
+      return;
+    }
+
+    // Validate time format
+    const timeRegex = /^([0-1]?[0-9]|2[0-3]):[0-5][0-9](:[0-5][0-9])?$/;
+    if (!timeRegex.test(scheduleData.start_time) || !timeRegex.test(scheduleData.end_time)) {
+      setSubmitError('Please enter valid time format (HH:MM or HH:MM:SS)');
+      return;
+    }
+
     setSubmitting(true);
-    setSubmitError(null);
     
     try {
-      await onSubmit(scheduleData);
+      const payload = {
+        course: scheduleData.course,
+        instructor: scheduleData.instructor,
+        day: scheduleData.day,
+        start_time: formatTimeForBackend(scheduleData.start_time),
+        end_time: formatTimeForBackend(scheduleData.end_time),
+        room: scheduleData.room || 'TBA'
+      };
+
+      await onSubmit(payload);
+      
       // Reset form on success
       setScheduleData({
         course: '',
         instructor: '',
         day: '',
-        startTime: '',
-        endTime: '',
+        start_time: '',
+        end_time: '',
         room: ''
       });
       onClose();
     } catch (error) {
-      console.error('Failed to add schedule:', error);
-      setSubmitError(error.message || 'Failed to add schedule. Please try again.');
+      console.error('Schedule submission error:', error);
+      setSubmitError(
+        error.message || 
+        error.response?.data?.error || 
+        error.response?.data?.detail || 
+        'Failed to add schedule. Please try again.'
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
-  // Generate stable keys for list items
-  const getCourseKey = (course) => course?.id || `course-${course?.code}`;
-  const getInstructorKey = (instructor) => instructor?.id || `instructor-${instructor?.email}`;
-
   return (
     <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
       <DialogTitle>Add New Schedule</DialogTitle>
       <DialogContent dividers>
-        {submitError && (
+        {/* Error Display */}
+        {(submitError || coursesError || instructorsError) && (
           <Alert severity="error" sx={{ mb: 2 }}>
-            {submitError}
+            {submitError || coursesError?.message || instructorsError?.message}
           </Alert>
         )}
 
-        <FormControl fullWidth sx={{ mb: 2 }}>
-          <InputLabel id="course-select-label">Course</InputLabel>
+        {/* Course Selection */}
+        <FormControl fullWidth sx={{ mb: 2 }} error={!!coursesError}>
+          <InputLabel>Course *</InputLabel>
           <Select
-            labelId="course-select-label"
-            label="Course"
             name="course"
             value={scheduleData.course}
             onChange={handleChange}
-            disabled={coursesLoading || coursesError}
+            disabled={coursesLoading}
+            label="Course *"
           >
-            <MenuItem key="course-none" value="">Select Course</MenuItem>
             {coursesLoading ? (
-              <MenuItem key="course-loading" disabled>
-                <CircularProgress size={20} sx={{ mr: 1 }} />
-                Loading courses...
+              <MenuItem disabled><CircularProgress size={20} /></MenuItem>
+            ) : courses?.map((course) => (
+              <MenuItem key={course.id} value={course.id}>
+                {course.name} ({course.code})
               </MenuItem>
-            ) : coursesError ? (
-              <MenuItem key="course-error" disabled>
-                Failed to load courses
-              </MenuItem>
-            ) : courseList.length === 0 ? (
-              <MenuItem key="course-empty" disabled>
-                No courses available
-              </MenuItem>
-            ) : (
-              courseList.map((course) => (
-                <MenuItem key={getCourseKey(course)} value={course.id}>
-                  {course.name} ({course.code})
-                </MenuItem>
-              ))
-            )}
+            ))}
           </Select>
         </FormControl>
 
-        <FormControl fullWidth sx={{ mb: 2 }}>
-          <InputLabel id="instructor-select-label">Instructor</InputLabel>
+        {/* Instructor Selection */}
+        <FormControl fullWidth sx={{ mb: 2 }} error={!!instructorsError}>
+          <InputLabel>Instructor *</InputLabel>
           <Select
-            labelId="instructor-select-label"
-            label="Instructor"
             name="instructor"
             value={scheduleData.instructor}
             onChange={handleChange}
-            disabled={instructorsLoading || instructorsError}
+            disabled={instructorsLoading}
+            label="Instructor *"
           >
-            <MenuItem key="instructor-none" value="">Select Instructor</MenuItem>
             {instructorsLoading ? (
-              <MenuItem key="instructor-loading" disabled>
-                <CircularProgress size={20} sx={{ mr: 1 }} />
-                Loading instructors...
+              <MenuItem disabled><CircularProgress size={20} /></MenuItem>
+            ) : instructors?.map((instructor) => (
+              <MenuItem key={instructor.id} value={instructor.id}>
+                {instructor.first_name} {instructor.last_name}
               </MenuItem>
-            ) : instructorsError ? (
-              <MenuItem key="instructor-error" disabled>
-                Failed to load instructors
-              </MenuItem>
-            ) : instructorList.length === 0 ? (
-              <MenuItem key="instructor-empty" disabled>
-                No instructors available
-              </MenuItem>
-            ) : (
-              instructorList.map((instructor) => (
-                <MenuItem key={getInstructorKey(instructor)} value={instructor.id}>
-                  {instructor.name}
-                </MenuItem>
-              ))
-            )}
+            ))}
           </Select>
         </FormControl>
 
+        {/* Day Selection */}
         <FormControl fullWidth sx={{ mb: 2 }}>
-          <InputLabel id="day-select-label">Day</InputLabel>
+          <InputLabel>Day *</InputLabel>
           <Select
-            labelId="day-select-label"
-            label="Day"
             name="day"
             value={scheduleData.day}
             onChange={handleChange}
+            label="Day *"
           >
-            <MenuItem key="day-none" value="">Select Day</MenuItem>
             {daysOfWeek.map((day) => (
-              <MenuItem key={`day-${day}`} value={day}>
+              <MenuItem key={day} value={day}>
                 {day}
               </MenuItem>
             ))}
           </Select>
         </FormControl>
 
+        {/* Time Inputs */}
         <TextField
-          margin="dense"
-          label="Start Time"
-          name="startTime"
+          label="Start Time *"
+          name="start_time"
           type="time"
           fullWidth
-          variant="outlined"
-          value={scheduleData.startTime}
+          value={scheduleData.start_time}
           onChange={handleChange}
           InputLabelProps={{ shrink: true }}
+          inputProps={{ step: 300 }} // 5 minute intervals
           sx={{ mb: 2 }}
+          helperText="Format: HH:MM"
         />
 
         <TextField
-          margin="dense"
-          label="End Time"
-          name="endTime"
+          label="End Time *"
+          name="end_time"
           type="time"
           fullWidth
-          variant="outlined"
-          value={scheduleData.endTime}
+          value={scheduleData.end_time}
           onChange={handleChange}
           InputLabelProps={{ shrink: true }}
+          inputProps={{ step: 300 }}
           sx={{ mb: 2 }}
+          helperText="Format: HH:MM"
         />
 
+        {/* Room Input */}
         <TextField
-          margin="dense"
-          label="Room Number"
+          label="Room"
           name="room"
           fullWidth
-          variant="outlined"
           value={scheduleData.room}
           onChange={handleChange}
+          helperText="Optional (default: TBA)"
         />
       </DialogContent>
       <DialogActions>
@@ -213,18 +213,12 @@ const AddScheduleDialog = ({ open, onClose, onSubmit }) => {
           Cancel
         </Button>
         <Button 
-          onClick={handleSubmit} 
-          variant="contained" 
-          disabled={
-            submitting || 
-            !scheduleData.course || 
-            !scheduleData.instructor || 
-            !scheduleData.day ||
-            !scheduleData.startTime ||
-            !scheduleData.endTime
-          }
+          onClick={handleSubmit}
+          variant="contained"
+          disabled={submitting}
+          endIcon={submitting ? <CircularProgress size={20} /> : null}
         >
-          {submitting ? <CircularProgress size={24} /> : 'Add Schedule'}
+          {submitting ? 'Adding...' : 'Add Schedule'}
         </Button>
       </DialogActions>
     </Dialog>

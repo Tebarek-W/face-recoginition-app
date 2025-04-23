@@ -15,11 +15,15 @@ class InstructorCreateSerializer(serializers.ModelSerializer):
     gender = serializers.CharField(write_only=True, required=True)
     password = serializers.CharField(write_only=True, required=True)
     avatar = serializers.ImageField(write_only=True, required=False)
-    courses = serializers.ListField(
-        child=serializers.IntegerField(),
+    courses = serializers.PrimaryKeyRelatedField(
+        many=True,
+        queryset=Course.objects.all(),
         write_only=True,
         required=False,
-        default=[]
+        error_messages={
+            'does_not_exist': 'Course with id {pk_value} does not exist.',
+            'incorrect_type': 'Expected course ID, got {data_type}'
+        }
     )
     department_id = serializers.PrimaryKeyRelatedField(
         queryset=Department.objects.all(),
@@ -98,7 +102,11 @@ class InstructorUpdateSerializer(serializers.ModelSerializer):
     courses = serializers.PrimaryKeyRelatedField(
         many=True,
         queryset=Course.objects.all(),
-        required=False
+        required=False,
+        error_messages={
+            'does_not_exist': 'Course with id {pk_value} does not exist.',
+            'incorrect_type': 'Expected course ID, got {data_type}'
+        }
     )
 
     class Meta:
@@ -109,12 +117,10 @@ class InstructorUpdateSerializer(serializers.ModelSerializer):
         ]
 
     def to_internal_value(self, data):
-        # Handle both FormData and JSON input
         if hasattr(data, 'getlist'):
             processed_data = {}
             for key in data:
                 if key == 'courses':
-                    # Handle both single and multiple course IDs
                     courses = data.getlist(key)
                     processed_data[key] = [int(course_id) for course_id in courses] if courses else []
                 elif key in ['department_id'] and data.get(key):
@@ -128,7 +134,6 @@ class InstructorUpdateSerializer(serializers.ModelSerializer):
         user_data = validated_data.pop('user', {})
         user = instance.user
         
-        # Update user fields
         for attr, value in user_data.items():
             if attr == 'password':
                 user.set_password(value)
@@ -136,19 +141,15 @@ class InstructorUpdateSerializer(serializers.ModelSerializer):
                 setattr(user, attr, value)
         user.save()
 
-        # Update instructor fields
         department = validated_data.pop('department', None)
         if department is not None:
             instance.department = department
 
-        # Handle courses update - only if 'courses' key exists in validated_data
         if 'courses' in validated_data:
             instance.courses.set(validated_data['courses'])
 
         instance.save()
         return instance
-    
-
 
 class InstructorBasicSerializer(serializers.ModelSerializer):
     email = serializers.EmailField(source='user.email', read_only=True)

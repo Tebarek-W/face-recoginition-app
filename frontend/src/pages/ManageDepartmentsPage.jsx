@@ -9,7 +9,7 @@ import {
 import { Add, Edit, Delete, Check, Close, Person } from '@mui/icons-material';
 import { format } from 'date-fns';
 
-const API_BASE_URL = 'http://127.0.0.1:8000/'; // Update with your backend URL
+const API_BASE_URL = 'http://127.0.0.1:8000/';
 
 const ManageDepartmentsPage = () => {
   // Data state
@@ -34,7 +34,7 @@ const ManageDepartmentsPage = () => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
-  // Enhanced fetch function with error handling
+  // Enhanced fetch function with better error handling
   const fetchWithAuth = async (endpoint, options = {}) => {
     const token = localStorage.getItem('token');
     try {
@@ -48,34 +48,33 @@ const ManageDepartmentsPage = () => {
       });
 
       if (!response.ok) {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Request failed');
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.message || 'Request failed');
       }
 
-      const contentType = response.headers.get('content-type');
-      if (contentType && contentType.includes('application/json')) {
-        return await response.json();
-      }
-      return await response.text();
+      return await response.json();
     } catch (error) {
       console.error(`API call to ${endpoint} failed:`, error);
       throw error;
     }
   };
 
-  // Fetch data on mount
+  // Fetch data on mount with proper error handling
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
+        setError(null);
+        
         const [departmentsData, headsData] = await Promise.all([
-          fetchWithAuth('/api/departments/'),
-          fetchWithAuth('/api/users/heads/')
+          fetchWithAuth('api/departments/').then(res => Array.isArray(res) ? res : []),
+          fetchWithAuth('api/users/').then(res => Array.isArray(res) ? res : [])
         ]);
         
         setDepartments(departmentsData);
         setHeads(headsData);
       } catch (err) {
+        console.error('Failed to fetch data:', err);
         setError(err.message || 'Failed to load data');
         setSnackbar({
           open: true,
@@ -90,6 +89,13 @@ const ManageDepartmentsPage = () => {
     fetchData();
   }, []);
 
+  // Helper function to get user display name
+  const getDisplayName = (user) => {
+    if (!user) return '';
+    if (user.name) return user.name;
+    return `${user.first_name || ''} ${user.last_name || ''}`.trim();
+  };
+
   // Format date for display
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -100,28 +106,28 @@ const ManageDepartmentsPage = () => {
     }
   };
 
-  // API operations
+  // API operations with improved error handling
   const handleAdd = async (payload) => {
-    return fetchWithAuth('/api/departments/', {
+    return fetchWithAuth('api/departments/', {
       method: 'POST',
       body: JSON.stringify(payload)
     });
   };
 
   const handleEdit = async (id, payload) => {
-    return fetchWithAuth(`/api/departments/${id}/`, {
+    return fetchWithAuth(`api/departments/${id}/`, {
       method: 'PUT',
       body: JSON.stringify(payload)
     });
   };
 
   const handleDelete = async (id) => {
-    return fetchWithAuth(`/api/departments/${id}/`, {
+    return fetchWithAuth(`api/departments/${id}/`, {
       method: 'DELETE'
     });
   };
 
-  // Form submission
+  // Form submission with validation
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!formData.name || !formData.name.trim()) {
@@ -141,6 +147,7 @@ const ManageDepartmentsPage = () => {
     };
 
     try {
+      setIsLoading(true);
       let updatedDepartments;
       if (currentDept) {
         const updatedDept = await handleEdit(currentDept.id, payload);
@@ -165,6 +172,8 @@ const ManageDepartmentsPage = () => {
         message: err.message || 'Operation failed',
         severity: 'error'
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -175,6 +184,7 @@ const ManageDepartmentsPage = () => {
     }
 
     try {
+      setIsLoading(true);
       await handleDelete(id);
       setDepartments(departments.filter(d => d.id !== id));
       setSnackbar({
@@ -188,6 +198,8 @@ const ManageDepartmentsPage = () => {
         message: err.message || 'Delete failed',
         severity: 'error'
       });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -223,6 +235,7 @@ const ManageDepartmentsPage = () => {
           startIcon={<Add />} 
           onClick={() => handleOpenDialog()}
           sx={{ minWidth: 180 }}
+          disabled={isLoading}
           aria-label="Add new department"
         >
           Add Department
@@ -252,77 +265,89 @@ const ManageDepartmentsPage = () => {
               </TableRow>
             </TableHead>
             <TableBody>
-              {departments.map(dept => (
-                <TableRow key={dept.id} hover>
-                  {!isMobile && <TableCell>{dept.id}</TableCell>}
-                  <TableCell>
-                    <Chip 
-                      label={dept.name} 
-                      color="primary" 
-                      size="small" 
-                      sx={{ fontWeight: 500 }}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    {dept.head_of_department ? (
-                      <Stack direction="row" alignItems="center" spacing={1}>
-                        <Avatar sx={{ width: 32, height: 32 }}>
-                          {dept.head_of_department.name.charAt(0)}
-                        </Avatar>
-                        <Box>
-                          <Typography variant="body2">
-                            {dept.head_of_department.name}
-                          </Typography>
-                          {!isMobile && (
-                            <Typography variant="caption" color="text.secondary">
-                              {dept.head_of_department.email}
-                            </Typography>
-                          )}
-                        </Box>
-                      </Stack>
-                    ) : (
+              {departments.length > 0 ? (
+                departments.map(dept => (
+                  <TableRow key={dept.id} hover>
+                    {!isMobile && <TableCell>{dept.id}</TableCell>}
+                    <TableCell>
                       <Chip 
-                        icon={<Person />}
-                        label={isMobile ? '' : "Not assigned"}
-                        variant="outlined"
-                        size="small"
+                        label={dept.name} 
+                        color="primary" 
+                        size="small" 
+                        sx={{ fontWeight: 500 }}
                       />
+                    </TableCell>
+                    <TableCell>
+                      {dept.head_of_department ? (
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <Avatar sx={{ width: 32, height: 32 }}>
+                            {getDisplayName(dept.head_of_department).charAt(0)}
+                          </Avatar>
+                          <Box>
+                            <Typography variant="body2">
+                              {getDisplayName(dept.head_of_department)}
+                            </Typography>
+                            {!isMobile && dept.head_of_department.email && (
+                              <Typography variant="caption" color="text.secondary">
+                                {dept.head_of_department.email}
+                              </Typography>
+                            )}
+                          </Box>
+                        </Stack>
+                      ) : (
+                        <Chip 
+                          icon={<Person />}
+                          label={isMobile ? '' : "Not assigned"}
+                          variant="outlined"
+                          size="small"
+                        />
+                      )}
+                    </TableCell>
+                    {!isMobile && (
+                      <TableCell>
+                        <Typography variant="body2">
+                          {formatDate(dept.created_at)}
+                        </Typography>
+                      </TableCell>
                     )}
-                  </TableCell>
-                  {!isMobile && (
-                    <TableCell>
-                      <Typography variant="body2">
-                        {formatDate(dept.created_at)}
-                      </Typography>
+                    {!isMobile && (
+                      <TableCell>
+                        <Typography variant="body2">
+                          {formatDate(dept.updated_at)}
+                        </Typography>
+                      </TableCell>
+                    )}
+                    <TableCell align="center">
+                      <Tooltip title="Edit department">
+                        <IconButton 
+                          onClick={() => handleOpenDialog(dept)}
+                          disabled={isLoading}
+                          aria-label={`Edit ${dept.name}`}
+                        >
+                          <Edit color="primary" />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Delete department">
+                        <IconButton 
+                          onClick={() => handleDeleteConfirm(dept.id)}
+                          disabled={isLoading}
+                          aria-label={`Delete ${dept.name}`}
+                        >
+                          <Delete color="error" />
+                        </IconButton>
+                      </Tooltip>
                     </TableCell>
-                  )}
-                  {!isMobile && (
-                    <TableCell>
-                      <Typography variant="body2">
-                        {formatDate(dept.updated_at)}
-                      </Typography>
-                    </TableCell>
-                  )}
-                  <TableCell align="center">
-                    <Tooltip title="Edit department">
-                      <IconButton 
-                        onClick={() => handleOpenDialog(dept)}
-                        aria-label={`Edit ${dept.name}`}
-                      >
-                        <Edit color="primary" />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete department">
-                      <IconButton 
-                        onClick={() => handleDeleteConfirm(dept.id)}
-                        aria-label={`Delete ${dept.name}`}
-                      >
-                        <Delete color="error" />
-                      </IconButton>
-                    </Tooltip>
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={isMobile ? 3 : 6} align="center">
+                    <Typography variant="body1" color="text.secondary">
+                      No departments found
+                    </Typography>
                   </TableCell>
                 </TableRow>
-              ))}
+              )}
             </TableBody>
           </Table>
         </TableContainer>
@@ -351,6 +376,7 @@ const ManageDepartmentsPage = () => {
               onChange={(e) => setFormData({...formData, name: e.target.value})}
               required
               sx={{ mt: 1 }}
+              disabled={isLoading}
               inputProps={{
                 'aria-label': 'Department name input'
               }}
@@ -366,14 +392,15 @@ const ManageDepartmentsPage = () => {
                   ...formData, 
                   head_of_department_id: e.target.value || null
                 })}
-                disabled={heads.length === 0}
+                disabled={isLoading || heads.length === 0}
               >
                 <MenuItem value="">
                   <em>No head assigned</em>
                 </MenuItem>
                 {heads.map(head => (
                   <MenuItem key={head.id} value={head.id}>
-                    {head.name}
+                    {getDisplayName(head)}
+                    {head.email && !isMobile && ` (${head.email})`}
                   </MenuItem>
                 ))}
               </Select>
@@ -400,6 +427,7 @@ const ManageDepartmentsPage = () => {
               onClick={handleCloseDialog} 
               startIcon={<Close />}
               sx={{ minWidth: 100 }}
+              disabled={isLoading}
               aria-label="Cancel department edit"
             >
               Cancel
@@ -409,10 +437,10 @@ const ManageDepartmentsPage = () => {
               variant="contained" 
               startIcon={<Check />}
               sx={{ minWidth: 100 }}
-              aria-label={currentDept ? 'Update department' : 'Create department'}
               disabled={isLoading}
+              aria-label={currentDept ? 'Update department' : 'Create department'}
             >
-              {currentDept ? 'Update' : 'Create'}
+              {isLoading ? <CircularProgress size={24} /> : currentDept ? 'Update' : 'Create'}
             </Button>
           </DialogActions>
         </form>

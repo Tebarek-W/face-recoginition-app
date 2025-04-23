@@ -108,13 +108,6 @@ const InstructorManagement = () => {
     return instructor.user?.email || instructor.email || 'No email provided';
   };
 
-  const getInstructorCourses = (instructor) => {
-    if (!instructor.courses) return 'No courses assigned';
-    return Array.isArray(instructor.courses) 
-      ? instructor.courses.map(c => typeof c === 'object' ? c.name : c).join(', ')
-      : 'No courses assigned';
-  };
-
   return (
     <Box sx={{ position: 'relative' }}>
       <Card sx={{ borderRadius: theme.shape.borderRadius }}>
@@ -225,24 +218,14 @@ const InstructorManagement = () => {
                         </Typography>
                       }
                       secondary={
-                        <>
-                          <Typography
-                            component="span"
-                            variant="body2"
-                            color="text.primary"
-                            display="block"
-                          >
-                            {getInstructorEmail(instructor)}
-                          </Typography>
-                          <Typography
-                            component="span"
-                            variant="body2"
-                            color="text.secondary"
-                            display="block"
-                          >
-                            Courses: {getInstructorCourses(instructor)}
-                          </Typography>
-                        </>
+                        <Typography
+                          component="span"
+                          variant="body2"
+                          color="text.primary"
+                          display="block"
+                        >
+                          {getInstructorEmail(instructor)}
+                        </Typography>
                       }
                     />
                   </ListItem>

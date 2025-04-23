@@ -22,8 +22,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
+    'facial_data',
     'rest_framework_simplejwt',
     'corsheaders',  # Add this
+    'django_extensions',
     'users',
     'analytics',
     'departments',
@@ -32,7 +34,6 @@ INSTALLED_APPS = [
     'courses',
     'students',
     'instructors',
-    'facial_data',
 ]
 
 MIDDLEWARE = [
@@ -111,6 +112,8 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # Media files (Uploaded files)
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+
+
 
 # Django REST Framework settings
 REST_FRAMEWORK = {

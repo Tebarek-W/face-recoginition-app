@@ -1,10 +1,6 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import FacialDataViewSet
-
-router = DefaultRouter()
-router.register(r'facial-data', FacialDataViewSet)
+from django.urls import path
+from .views import LivenessVerificationAPI
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path('verify/', LivenessVerificationAPI.as_view(), name='liveness-verify'),
 ]
