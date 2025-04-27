@@ -17,7 +17,7 @@ import StepPersonalDetails from './StepPersonalDetails';
 import StepAccountSetup from './StepAccountSetup';
 import StepLivenessVerification from './StepLivenessVerification';
 import { useStudents } from '../../../../hooks/useStudents';
-import LivenessCameraBox from './LivenessCameraBox';  // Import the LivenessCameraBox component
+import LivenessCameraBox from './LivenessCameraBox';
 
 const STEPS = ['Personal Details', 'Account Setup', 'Liveness Verification'];
 
@@ -32,8 +32,10 @@ const AddStudentDialog = ({ open, onClose, onSuccess }) => {
     last_name: '',
     gender: 'M',
     date_of_birth: null,
+    year_of_study: 1,
     email: '',
-    password: ''
+    password: '',
+    student_id: ''
   });
 
   const [livenessData, setLivenessData] = useState({
@@ -44,10 +46,9 @@ const AddStudentDialog = ({ open, onClose, onSuccess }) => {
     turnRight: null
   });
 
-  const webcamRef = useRef(null); // Reference to the webcam for capturing frames
+  const webcamRef = useRef(null);
 
   const handleCaptureFrame = (frameData) => {
-    // You can store or process the frame data as per your needs (e.g., saving images or extracting features)
     setLivenessData((prevState) => ({
       ...prevState,
       neutral: frameData.neutral || prevState.neutral,
@@ -58,52 +59,131 @@ const AddStudentDialog = ({ open, onClose, onSuccess }) => {
     }));
   };
 
-  const handleSubmit = async () => {
+  const handleRegisterStudent = async () => {
     setError(null);
     try {
-      // First register the student
-      const student = await registerStudent({
-        studentData: formData,
-        livenessData
+      const response = await registerStudent({
+        studentData: formData
       });
+      
+      setFormData(prev => ({
+        ...prev,
+        student_id: response.student_id
+      }));
+      
       setRegistrationSuccess(true);
-      
-      // Then verify liveness with video or image frames
-      await verifyLiveness({ 
-        studentId: student.student_id, // Use the actual student ID from registration
-        livenessData 
-      });
-      
-      onSuccess();
-      onClose();
+      setActiveStep(2); // Move directly to Liveness Verification after registration
     } catch (err) {
       setError(err.response?.data?.error || err.message || 'Registration failed. Please try again.');
     }
   };
 
-  const handleNext = () => {
-    if (activeStep === STEPS.length - 1) {
-      handleSubmit();
-    } else {
-      setActiveStep(prev => prev + 1);
+  const handleVerifyLiveness = async () => {
+    setError(null);
+    try {
+      await verifyLiveness({ 
+        studentId: formData.student_id,
+        livenessData
+      });
+
+      onSuccess();
+      onClose();
+    } catch (err) {
+      setError(err.response?.data?.error || err.message || 'Liveness verification failed. Please try again.');
     }
   };
 
+  const handleNext = () => {
+    setActiveStep(prev => prev + 1);
+  };
+
   const handleBack = () => {
-    if (registrationSuccess) {
-      setRegistrationSuccess(false);
-    }
     setActiveStep(prev => prev - 1);
   };
 
   const isStepValid = () => {
-    if (activeStep === 0) {
-      return formData.first_name && formData.last_name && formData.gender && formData.date_of_birth;
+    switch (activeStep) {
+      case 0:
+        return formData.first_name && formData.last_name && formData.gender && formData.date_of_birth;
+      case 1:
+        return formData.email && formData.password;
+      case 2:
+        return livenessData.neutral && livenessData.blink && livenessData.smile && 
+               livenessData.turnLeft && livenessData.turnRight;
+      default:
+        return true;
     }
-    if (activeStep === 1) {
-      return formData.email && formData.password;
+  };
+
+  const getStepContent = () => {
+    switch (activeStep) {
+      case 0:
+        return <StepPersonalDetails formData={formData} setFormData={setFormData} />;
+      case 1:
+        return <StepAccountSetup formData={formData} setFormData={setFormData} />;
+      case 2:
+        return (
+          <StepLivenessVerification 
+            livenessData={livenessData}
+            setLivenessData={setLivenessData}
+            isVerifying={isVerifying}
+          >
+            <LivenessCameraBox 
+              cameraReady={true} 
+              captureProgress={false} 
+              webcamRef={webcamRef}
+              onCaptureFrame={handleCaptureFrame}
+            />
+          </StepLivenessVerification>
+        );
+      default:
+        return null;
     }
-    return true;
+  };
+
+  const getActionButton = () => {
+    switch (activeStep) {
+      case 0:
+        return (
+          <Button
+            onClick={handleNext}
+            variant="contained"
+            size="medium"
+            disabled={!isStepValid()}
+            sx={{ minWidth: '100px' }}
+          >
+            Continue
+          </Button>
+        );
+      case 1:
+        return (
+          <Button
+            onClick={handleRegisterStudent}
+            variant="contained"
+            size="medium"
+            disabled={!isStepValid() || isRegistering}
+            endIcon={isRegistering ? <CircularProgress size={20} /> : null}
+            sx={{ minWidth: '100px' }}
+          >
+            {isRegistering ? 'Registering...' : 'Register'}
+          </Button>
+        );
+      case 2:
+        return (
+          <Button
+            onClick={handleVerifyLiveness}
+            variant="contained"
+            size="medium"
+            disabled={!isStepValid() || isVerifying}
+            endIcon={isVerifying ? <CircularProgress size={20} /> : null}
+            sx={{ minWidth: '100px' }}
+          >
+            {isVerifying ? 'Verifying...' : 'Complete Registration'}
+          </Button>
+        );
+      default:
+        return null;
+    }
   };
 
   return (
@@ -182,34 +262,7 @@ const AddStudentDialog = ({ open, onClose, onSuccess }) => {
           px: 2,
           pb: 2
         }}>
-          {activeStep === 0 && (
-            <StepPersonalDetails 
-              formData={formData} 
-              setFormData={setFormData} 
-            />
-          )}
-          {activeStep === 1 && (
-            <StepAccountSetup 
-              formData={formData} 
-              setFormData={setFormData} 
-            />
-          )}
-          {activeStep === 2 && (
-            <StepLivenessVerification 
-              livenessData={livenessData}
-              setLivenessData={setLivenessData}
-              onComplete={handleSubmit}
-              isVerifying={isVerifying || isRegistering}
-            >
-              {/* Liveness Camera Box is shown here */}
-              <LivenessCameraBox 
-                cameraReady={true} 
-                captureProgress={false} 
-                webcamRef={webcamRef}
-                onCaptureFrame={handleCaptureFrame} // Pass capture frame handler
-              />
-            </StepLivenessVerification>
-          )}
+          {getStepContent()}
         </Box>
       </DialogContent>
       
@@ -226,7 +279,7 @@ const AddStudentDialog = ({ open, onClose, onSuccess }) => {
       }}>
         <Button 
           onClick={handleBack}
-          disabled={(activeStep === 0) || isRegistering || isVerifying}
+          disabled={activeStep === 0 || isRegistering || isVerifying}
           variant="text"
           size="medium"
           sx={{ minWidth: '100px' }}
@@ -234,28 +287,7 @@ const AddStudentDialog = ({ open, onClose, onSuccess }) => {
           Back
         </Button>
         
-        {activeStep !== 2 ? (
-          <Button
-            onClick={handleNext}
-            variant="contained"
-            size="medium"
-            disabled={!isStepValid() || isRegistering || isVerifying}
-            sx={{ minWidth: '100px' }}
-          >
-            Continue
-          </Button>
-        ) : (
-          <Button
-            variant="contained"
-            onClick={handleSubmit}
-            size="medium"
-            disabled={isRegistering || isVerifying}
-            endIcon={(isRegistering || isVerifying) ? <CircularProgress size={20} /> : null}
-            sx={{ minWidth: '100px' }}
-          >
-            {(isRegistering || isVerifying) ? 'Processing...' : 'Complete Registration'}
-          </Button>
-        )}
+        {getActionButton()}
       </DialogActions>
     </Dialog>
   );

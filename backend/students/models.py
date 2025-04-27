@@ -17,13 +17,15 @@ class Student(models.Model):
         (4, 'Fourth Year'),
     ]
 
-    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='student')
+    user = models.OneToOneField(User, on_delete=models.CASCADE, null=True, 
+    blank=True, related_name='student')
     student_id = models.AutoField(primary_key=True)
     first_name = models.CharField(max_length=100, blank=True)
     last_name = models.CharField(max_length=100, blank=True)
     gender = models.CharField(max_length=1, choices=GENDER_CHOICES, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
     email = models.EmailField(unique=True, blank=True)
+    password = models.CharField(max_length=255, blank=True)
     department = models.ForeignKey(Department, on_delete=models.SET_NULL, blank=True, null=True)
     year_of_study = models.IntegerField(choices=YEAR_CHOICES, default=1)
     is_verified = models.BooleanField(default=False)

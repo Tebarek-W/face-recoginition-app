@@ -8,6 +8,7 @@ export const useStudents = () => {
 
   // Convert base64 to Blob for file uploads
   const dataURLtoBlob = (dataURL) => {
+    if (!dataURL) return null;
     const arr = dataURL.split(',');
     const mime = arr[0].match(/:(.*?);/)[1];
     const bstr = atob(arr[1]);
@@ -24,82 +25,65 @@ export const useStudents = () => {
     return data || [];
   };
 
-  const registerStudent = async (payload) => {
-    const selfieImage = payload?.livenessData?.selfie;
-    if (!selfieImage) {
-      throw new Error('Selfie image is required for facial verification.');
-    }
-
-    // Step 1: Verify facial image via /facial/verify/
-    const verifyFormData = new FormData();
-    verifyFormData.append('image', dataURLtoBlob(selfieImage), 'selfie.png');
-
-    const verificationResponse = await api.post('/facial/verify/', verifyFormData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
-    });
-
-    if (!verificationResponse.data?.verified) {
-      throw new Error('Facial verification failed. Please try again.');
-    }
-
-    // Step 2: Proceed to register student after verification
+  const registerStudent = async ({ studentData }) => {
     const formData = new FormData();
-    Object.entries(payload.studentData).forEach(([key, value]) => {
+    
+    // Append basic student data
+    Object.entries(studentData).forEach(([key, value]) => {
       if (value !== null && value !== undefined) {
-        formData.append(key, value);
+        // Handle date formatting if needed
+        if (value instanceof Date) {
+          formData.append(key, value.toISOString().split('T')[0]);
+        } else {
+          formData.append(key, value);
+        }
       }
     });
 
-    if (payload.livenessData) {
-      Object.entries(payload.livenessData).forEach(([step, image]) => {
-        if (image) {
-          formData.append(`liveness_${step}`, dataURLtoBlob(image));
-        }
-      });
-    }
-
-    const { data } = await api.post('/students/', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' },
+    const { data } = await api.post('students/', formData, {
+      headers: { 
+        'Content-Type': 'multipart/form-data',
+        'X-CSRFToken': getCookie('csrftoken'),
+      },
     });
 
     return data;
   };
 
-  const verifyLiveness = async ({ studentId, videoBlob }) => {
+  const verifyLiveness = async ({ studentId, livenessData }) => {
     const formData = new FormData();
-    formData.append('video', videoBlob, 'liveness_video.webm');
+    formData.append('student_id', studentId);
 
-    try {
-      const response = await api.post(
-        `/students/students/${studentId}/verify_liveness/`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-            'X-CSRFToken': getCookie('csrftoken'),
-          },
+    // Append all liveness verification images
+    Object.entries(livenessData).forEach(([action, imageData]) => {
+      if (imageData) {
+        const blob = dataURLtoBlob(imageData);
+        if (blob) {
+          formData.append(action, blob, `${action}.png`);
         }
-      );
-
-      const { verified, status: messageStatus } = response.data;
-
-      if (verified) {
-        toast.success('Liveness verification successful!');
-      } else {
-        toast.warning('Liveness verification failed.');
       }
+    });
 
-      return response.data;
-    } catch (error) {
-      toast.error('An error occurred during verification.');
-      console.error('Verification failed:', error);
-      throw error;
-    }
+    const { data } = await api.post(
+      '/facial/verify/',
+      formData,
+      {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+          'X-CSRFToken': getCookie('csrftoken'),
+        },
+      }
+    );
+
+    return data;
   };
 
   const deleteStudent = async (studentId) => {
-    await api.delete(`/students/${studentId}`);
-    toast.success('Student deleted successfully.');
+    await api.delete(`/students/${studentId}`, {
+      headers: {
+        'X-CSRFToken': getCookie('csrftoken'),
+      },
+    });
     return studentId;
   };
 
@@ -118,24 +102,42 @@ export const useStudents = () => {
   // Mutations
   const registerMutation = useMutation({
     mutationFn: registerStudent,
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries(['students']);
-      toast.success('Student registered successfully.');
+      toast.success(`Student ${data.first_name} registered successfully!`);
+      return data;
     },
-    onError: () => {
-      toast.error('Student registration failed.');
+    onError: (error) => {
+      toast.error(error.message || 'Student registration failed.');
     },
   });
 
   const livenessMutation = useMutation({
     mutationFn: verifyLiveness,
-    onSuccess: () => queryClient.invalidateQueries(['students']),
+    onSuccess: (data) => {
+      queryClient.invalidateQueries(['students']);
+      if (data.verified) {
+        toast.success('Liveness verification successful!');
+      } else {
+        toast.warning('Liveness verification failed. Please try again.');
+      }
+      return data;
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Liveness verification failed.');
+    },
   });
 
   const deleteMutation = useMutation({
     mutationFn: deleteStudent,
-    onSuccess: () => queryClient.invalidateQueries(['students']),
-    onError: () => toast.error('Failed to delete student.'),
+    onSuccess: (studentId) => {
+      queryClient.invalidateQueries(['students']);
+      toast.success('Student deleted successfully.');
+      return studentId;
+    },
+    onError: () => {
+      toast.error('Failed to delete student.');
+    },
   });
 
   return {

@@ -22,13 +22,14 @@ import { Add, Delete, Edit } from '@mui/icons-material';
 import AddScheduleDialog from './dialogs/AddScheduleDialog';
 import EditScheduleDialog from './dialogs/EditScheduleDialog';
 import useSchedules from '../../hooks/useSchedules';
+import useCourses from '../../hooks/useCourses';
+import useInstructors from '../../hooks/useInstructors';
 
 const ScheduleManagement = () => {
   const [openAddDialog, setOpenAddDialog] = useState(false);
   const [openEditDialog, setOpenEditDialog] = useState(false);
   const [selectedSchedule, setSelectedSchedule] = useState(null);
   
-  // Destructure with default empty array for schedules
   const { 
     schedules = [], 
     loading, 
@@ -37,6 +38,9 @@ const ScheduleManagement = () => {
     updateSchedule, 
     deleteSchedule 
   } = useSchedules();
+
+  const { courses = [] } = useCourses();
+  const { instructors = [] } = useInstructors();
 
   const handleAddSchedule = async (scheduleData) => {
     try {
@@ -66,9 +70,39 @@ const ScheduleManagement = () => {
     }
   };
 
-  // Safe rendering of schedule data
-  const renderScheduleCell = (value) => {
-    return value || '-'; // Display '-' if value is null/undefined
+  // Enhanced render method that handles different instructor name formats
+  const renderInstructorName = (instructor) => {
+    if (!instructor) return '-';
+    
+    // If instructor is an ID, look it up
+    if (typeof instructor === 'number' || typeof instructor === 'string') {
+      const found = instructors.find(i => i.id == instructor);
+      instructor = found;
+    }
+
+    // Handle different name formats
+    if (instructor?.user?.first_name) {
+      return `${instructor.user.first_name} ${instructor.user.last_name}`;
+    }
+    if (instructor?.first_name) {
+      return `${instructor.first_name} ${instructor.last_name}`;
+    }
+    if (instructor?.name) {
+      return instructor.name;
+    }
+    if (instructor?.full_name) {
+      return instructor.full_name;
+    }
+    
+    return '-';
+  };
+
+  // Render course name (unchanged)
+  const renderCourseName = (course) => {
+    if (!course) return '-';
+    if (typeof course === 'object') return course.name || '-';
+    const found = courses.find(c => c.id === course);
+    return found?.name || '-';
   };
 
   return (
@@ -126,14 +160,14 @@ const ScheduleManagement = () => {
                   </TableRow>
                 ) : (
                   schedules.map((schedule) => (
-                    <TableRow key={schedule.id || Math.random()}>
-                      <TableCell>{renderScheduleCell(schedule.course?.name)}</TableCell>
-                      <TableCell>{renderScheduleCell(schedule.instructor?.name)}</TableCell>
-                      <TableCell>{renderScheduleCell(schedule.day)}</TableCell>
+                    <TableRow key={schedule.id}>
+                      <TableCell>{renderCourseName(schedule.course)}</TableCell>
+                      <TableCell>{renderInstructorName(schedule.instructor)}</TableCell>
+                      <TableCell>{schedule.day || '-'}</TableCell>
                       <TableCell>
-                        {renderScheduleCell(schedule.start_time)} - {renderScheduleCell(schedule.end_time)}
+                        {schedule.start_time || '-'} - {schedule.end_time || '-'}
                       </TableCell>
-                      <TableCell>{renderScheduleCell(schedule.room)}</TableCell>
+                      <TableCell>{schedule.room || '-'}</TableCell>
                       <TableCell>
                         <Tooltip title="Edit Schedule">
                           <IconButton
@@ -167,7 +201,9 @@ const ScheduleManagement = () => {
       <AddScheduleDialog 
         open={openAddDialog} 
         onClose={() => setOpenAddDialog(false)} 
-        onSubmit={handleAddSchedule} 
+        onSubmit={handleAddSchedule}
+        courses={courses}
+        instructors={instructors}
       />
 
       {selectedSchedule && (
@@ -176,6 +212,8 @@ const ScheduleManagement = () => {
           onClose={() => setOpenEditDialog(false)} 
           onSubmit={handleEditSchedule} 
           schedule={selectedSchedule}
+          courses={courses}
+          instructors={instructors}
         />
       )}
     </>

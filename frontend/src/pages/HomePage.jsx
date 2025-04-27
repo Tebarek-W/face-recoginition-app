@@ -1,23 +1,91 @@
-// src/pages/HomePage.js
-import React from 'react';
-import { Typography, Box, Button } from '@mui/material';
+import React, { useState, useEffect } from 'react';
+import { Typography, Box, Button, Badge, IconButton, Popover, List, ListItem, ListItemText } from '@mui/material';
+import NotificationsIcon from '@mui/icons-material/Notifications';
 import { useNavigate } from 'react-router-dom';
 
 const HomePage = () => {
   const navigate = useNavigate();
+  const [notifications, setNotifications] = useState([]);
+  const [anchorEl, setAnchorEl] = useState(null);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [wsConnected, setWsConnected] = useState(false);
 
   const handleLoginClick = () => {
-    navigate('/login'); // Redirect to the login page
+    navigate('/login');
   };
+
+  const handleNotificationClick = (event) => {
+    setAnchorEl(event.currentTarget);
+    setUnreadCount(0); // Mark all as read when opened
+  };
+
+  const handleClose = () => {
+    setAnchorEl(null);
+  };
+
+  useEffect(() => {
+    const wsUrl = process.env.NODE_ENV === 'production'
+      ? 'wss://yourproductionurl.com/ws/schedule_notifications/' // replace with production URL
+      : 'ws://127.0.0.1:8000/ws/schedule_notifications/'; // WebSocket URL for local development
+
+    let socket;
+    let retryCount = 0;
+    const maxRetries = 3;
+
+    const connectWebSocket = () => {
+      socket = new WebSocket(wsUrl);
+
+      socket.onopen = () => {
+        console.log('WebSocket successfully connected');
+        setWsConnected(true);
+        retryCount = 0; // Reset retry counter on success
+      };
+
+      socket.onerror = (e) => {
+        console.error('WebSocket error:', e);
+        setWsConnected(false);
+      };
+
+      socket.onclose = (e) => {
+        console.log(`WebSocket closed (code ${e.code})`);
+        if (e.code !== 1000 && retryCount < maxRetries) { // 1000 = normal closure
+          retryCount++;
+          console.log(`Retrying connection (attempt ${retryCount})`);
+          setTimeout(connectWebSocket, 2000 * retryCount); // Exponential backoff
+        }
+      };
+
+      socket.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          setNotifications(prev => [data, ...prev]);
+          setUnreadCount(prev => prev + 1);
+        } catch (err) {
+          console.error('Failed to parse WebSocket message:', err);
+        }
+      };
+    };
+
+    connectWebSocket();
+
+    return () => {
+      if (socket && socket.readyState === WebSocket.OPEN) {
+        socket.close(1000, 'Component unmounted');
+      }
+    };
+  }, []);
+
+  const open = Boolean(anchorEl);
+  const id = open ? 'notification-popover' : undefined;
 
   return (
     <Box
       sx={{
         minHeight: '100vh',
-        width: '100vw', // Ensure full viewport width
+        width: '100vw',
         background: 'linear-gradient(135deg, #1a1a1a, #003366)',
         position: 'relative',
-        overflow: 'hidden', // Prevent horizontal scrolling
+        overflow: 'hidden',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -36,7 +104,47 @@ const HomePage = () => {
         },
       }}
     >
-      {/* Abstract AI/Facial Recognition Icons */}
+      <Box sx={{ position: 'absolute', top: 20, right: 20, zIndex: 3 }}>
+        <IconButton color="inherit" onClick={handleNotificationClick}>
+          <Badge badgeContent={unreadCount} color="error">
+            <NotificationsIcon fontSize="large" />
+          </Badge>
+        </IconButton>
+        <Popover
+          id={id}
+          open={open}
+          anchorEl={anchorEl}
+          onClose={handleClose}
+          anchorOrigin={{
+            vertical: 'bottom',
+            horizontal: 'right',
+          }}
+          transformOrigin={{
+            vertical: 'top',
+            horizontal: 'right',
+          }}
+        >
+          <Box sx={{ width: 360, maxHeight: 400, overflow: 'auto' }}>
+            <List>
+              {notifications.length > 0 ? (
+                notifications.map((notification, index) => (
+                  <ListItem key={index}>
+                    <ListItemText
+                      primary={notification.message}
+                      secondary={new Date().toLocaleString()}
+                    />
+                  </ListItem>
+                ))
+              ) : (
+                <ListItem>
+                  <ListItemText primary="No notifications" />
+                </ListItem>
+              )}
+            </List>
+          </Box>
+        </Popover>
+      </Box>
+
       <Box
         sx={{
           position: 'absolute',
@@ -61,7 +169,7 @@ const HomePage = () => {
           maxWidth: '800px',
           width: '100%',
           padding: 3,
-          marginTop: '64px', // Add marginTop to account for Navbar height
+          marginTop: '64px',
         }}
       >
         <Typography

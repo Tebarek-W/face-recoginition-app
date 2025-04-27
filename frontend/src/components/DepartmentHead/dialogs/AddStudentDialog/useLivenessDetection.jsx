@@ -1,22 +1,6 @@
-// components/DepartmentHead/dialogs/AddStudentDialog/useLivenessDetection.jsx
 import { useState, useRef, useEffect } from 'react';
 import * as faceapi from 'face-api.js';
-
-export const LivenessSteps = {
-  NEUTRAL: 'neutral',
-  BLINK: 'blink',
-  SMILE: 'smile',
-  TURN_LEFT: 'turnLeft',
-  TURN_RIGHT: 'turnRight'
-};
-
-export const LivenessInstructions = {
-  [LivenessSteps.NEUTRAL]: 'Look straight at the camera',
-  [LivenessSteps.BLINK]: 'Blink your eyes naturally',
-  [LivenessSteps.SMILE]: 'Smile naturally',
-  [LivenessSteps.TURN_LEFT]: 'Slowly turn your head to the left',
-  [LivenessSteps.TURN_RIGHT]: 'Slowly turn your head to the right'
-};
+import { LivenessSteps, LivenessInstructions } from './livenessConstants';
 
 const useLivenessDetection = (livenessData, setLivenessData) => {
   const [currentLivenessStep, setCurrentLivenessStep] = useState(LivenessSteps.NEUTRAL);
@@ -55,6 +39,11 @@ const useLivenessDetection = (livenessData, setLivenessData) => {
     const totalFrames = 10;
 
     captureInterval.current = setInterval(async () => {
+      if (!webcamRef.current?.video || webcamRef.current.video.readyState !== 4) {
+        console.warn('Webcam not ready');
+        return;
+      }
+
       framesCaptured++;
       setCaptureProgress((framesCaptured / totalFrames) * 100);
 
@@ -85,14 +74,15 @@ const useLivenessDetection = (livenessData, setLivenessData) => {
   };
 
   const captureFrame = async () => {
-    if (!webcamRef.current?.video || webcamRef.current.video.readyState !== 4) {
+    const video = webcamRef.current?.video;
+    if (!video || video.readyState !== 4) {
       console.warn('Webcam not ready');
       return;
     }
 
     try {
       const detections = await faceapi
-        .detectAllFaces(webcamRef.current.video)
+        .detectAllFaces(video)
         .withFaceLandmarks()
         .withFaceExpressions();
 
@@ -112,10 +102,10 @@ const useLivenessDetection = (livenessData, setLivenessData) => {
       }
 
       const canvas = document.createElement('canvas');
-      canvas.width = webcamRef.current.video.videoWidth;
-      canvas.height = webcamRef.current.video.videoHeight;
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
       const context = canvas.getContext('2d');
-      context.drawImage(webcamRef.current.video, 0, 0, canvas.width, canvas.height);
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
       const imageSrc = canvas.toDataURL('image/png');
 
       if (imageSrc) {

@@ -67,15 +67,6 @@ const InstructorPage = () => {
         Instructor Dashboard
       </Typography>
 
-      {/* Logout Button */}
-      <Button
-        variant="contained"
-        color="secondary"
-        onClick={handleLogout}
-        sx={{ mb: 3 }}
-      >
-        Logout
-      </Button>
 
       {/* Set Attendance Policies */}
       <Box sx={{ mb: 4 }}>

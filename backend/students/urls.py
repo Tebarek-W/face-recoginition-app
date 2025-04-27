@@ -1,13 +1,10 @@
-from django.urls import path
+from django.urls import path, include
 from rest_framework.routers import DefaultRouter
 from .views import StudentViewSet
 
 router = DefaultRouter()
-router.register(r'students', StudentViewSet, basename='student')
+router.register(r'students', StudentViewSet)
 
 urlpatterns = [
-    # This registers the 'verify_liveness' action with the correct viewset method
-    path('students/<str:student_id>/verify_liveness/', 
-         StudentViewSet.as_view({'post': 'verify_liveness'}), 
-         name='student-verify-liveness'),
-] + router.urls
+    path('', include(router.urls)),
+]

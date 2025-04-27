@@ -34,7 +34,32 @@ INSTALLED_APPS = [
     'courses',
     'students',
     'instructors',
+    'channels',
+    'django_celery_beat',
 ]
+
+
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': 'redis://127.0.0.1:6379/1',  # Ensure Redis is running locally
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+        }
+    }
+}
+
+
+ASGI_APPLICATION = "facial_attendance_system.asgi.application"
+
+
+# settings.py
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
+CELERY_RESULT_BACKEND = 'redis://localhost:6379/0'
+
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',  # Add this at the top
